@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "es2015",
+    "module": "esnext",
+    "noImplicitAny": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "sourceMap": true,
+    "declaration": true,
+    "outDir": "dist",
+    "lib": ["es2017", "dom"]
+  },
+  "parcel-plugin-typescript": {
+    "transpileOnly": true
+  }
+}

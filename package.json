@@ -10,6 +10,6 @@
     "typescript": "^3.7.4"
   },
   "scripts": {
-    "build": "tsc --build && parcel build dist/index.js && cp project/package.json dist/package.json && cp project/README.md dist/README.md"
+    "build": "tsc --build && parcel build dist/index.js && cp project/package.json dist/package.json && cp README.md dist/README.md"
   }
 }

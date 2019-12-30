@@ -1,10 +1,10 @@
 {
   "name": "vanilla-milk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Simple library for build web component",
   "main": "index.js",
   "repository": "https://github.com/SaltyAom/vanilla-milk",
   "author": "SaltyAom",
   "license": "MIT",
-  "keywords": ["vanilla milk", "web component"]
+  "keywords": ["vanilla milk", "web component", "vanilla milk js"]
 }

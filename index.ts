@@ -1,9 +1,6 @@
-        // "build": "rm -rf dist && tsc --build && terser dist/index.js -o dist/index.js --compress --mangle && cp project/package.json dist/package.json && cp README.md dist/README.md"
-
-
 interface MilkProperty {
 	query: string
-	event: string
+	event: string | string[]
 	then([state, set]: any): void
 }
 
@@ -151,15 +148,19 @@ export const create = (
 				let mappedState = this.mapState()
 
 				properties.map(property => {
-					let { query, event, then } = property
-					this.element.querySelector(query).addEventListener(event, () => {
-						let prevState = this.mapState(Object.assign({}, this.state))[0]
-						then(mappedState)
-						let state = this.mapState(Object.assign({}, this.state))[0]
+					let { query, event, then } = property,
+						eachEvent = Array.isArray(event) ? event : event.replace(/ /g, "").split(",")
 
-						this.callStateLifeCycle(prevState, state)
-						this.update()
-					})
+					eachEvent.forEach((eventName) =>
+						this.element.querySelector(query).addEventListener(eventName, () => {
+							let prevState = this.mapState(Object.assign({}, this.state))[0]
+							then(mappedState)
+							let state = this.mapState(Object.assign({}, this.state))[0]
+
+							this.callStateLifeCycle(prevState, state)
+							this.update()
+						})
+					)
 				})
 			}
 

@@ -1,15 +1,21 @@
 {
-  "name": "vanilla-milk",
-  "version": "0.0.1",
-  "description": "Simple library for building web component",
-  "main": "index.js",
-  "license": "MIT",
-  "dependencies": {
-    "parcel-bundler": "^1.12.4",
-    "parcel-plugin-typescript": "^1.0.0",
-    "typescript": "^3.7.4"
-  },
-  "scripts": {
-    "build": "tsc --build && parcel build dist/index.js && cp project/package.json dist/package.json && cp README.md dist/README.md"
-  }
+    "name": "vanilla-milk",
+    "version": "0.0.1",
+    "description": "Simple library for building web component",
+    "main": "index.js",
+    "license": "MIT",
+    "dependencies": {
+        "global": "^4.4.0"
+    },
+    "scripts": {
+        "build": "rm -rf dist && tsc --build && terser dist/index.js -o dist/index.js --compress --mangle && cp project/package.json dist/package.json && cp README.md dist/README.md"
+    },
+    "devDependencies": {
+        "babel-core": "^6.26.3",
+        "babel-preset-env": "^1.7.0",
+        "parcel-bundler": "^1.12.4",
+        "parcel-plugin-typescript": "^1.0.0",
+        "terser": "^4.4.3",
+        "typescript": "^3.7.4"
+    }
 }

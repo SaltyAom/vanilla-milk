@@ -1,5 +1,5 @@
 # Vanilla Milk
-Simple library for building reactive web components.
+Simple library for building simple reactive web components.
   
 ## What is...
 Vanilla Milk create component which is can be used on any view library or framework of your choice! Embrace future of web-component made it future-proof. Built-in reactive state and props but also is very small and fast.
@@ -22,7 +22,7 @@ Glad you're interested in! Let's get over quick start! Let us add library just f
 Let install this real quick with package manager of your choice.
 ```bash
 // Using npm
-npm install vanilla-milk --save-dev
+npm install vanilla-milk --save
 
 // Using yarn
 yarn add vanilla-milk
@@ -89,9 +89,8 @@ Just add `<milk-component></milk-component>` in HTML. Make sure you've link the 
 </html>
 ```
 And it should display something like this.
-__
   
-#### But that's not what make `Vanilla Milk` special...
+#### But that's not what make Vanilla Milk special...
 In Vanilla Milk, component are reactive which mean every time `state` or `props` changed, Milk Component will know it.
 
 ## State
@@ -154,7 +153,7 @@ Now that will display `count` to HTML, so... how do we set it in Vanilla Milk?
 As an early state of development of Vanilla Milk that's where the last parameter of `create` kick in!  
 We add button and attach event in to it, so we can change the value of `counter`. // Hey don't make face of disappointment like that! I'll fix it in some next update, I promise! It's quite hard to create something like that ya know.
   
-Now let's a button
+Let add a button.
 ```javascript
 import { create, define, useState } from "vanilla-milk"
 
@@ -279,7 +278,15 @@ Again, add it to second paramter of `create` like `useState` and `useProps`
 	hello: useProps(),
 	logHello: useEffect((state, props) => {
     	console.log(props.hello) // Log everytime hello changed
-    })
+    }, ["hello"])
 }
 ```
+Notice that we add array contain "hello" as string as the second parameter of useEffect.
+Because we can't directly access value of hello so we just add it as string, Vanilla Milk will take care of the rest (In fact, we can add it as variable but it takes an extra effort and performance cost).
+
 You can express name of `useEffect` as anything, It just easier to remind you lifecycle with name if there are too much lifecycle.
+
+Now we hello is changed, first callback will run. Like view callback, useEffect is paired with `(state, props)`. You can directly access it in the callback.
+  
+That's pretty much it of Vanilla Milk 0.1.2. :tada::tada:
+I'm looking for implement more functionality to this project soon! ps. vdom are also planned to be added in the future~ Stay tuned!

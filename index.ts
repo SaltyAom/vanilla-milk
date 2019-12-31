@@ -1,14 +1,14 @@
 interface MilkProperty {
 	query: string
 	event: string | string[]
-	then([state, set]: any): void
+	then([state, set]: [
+		{ [key: string]: any },
+		{ [stateName: string]: Function }
+	]): void
 }
 
 type MilkEvent = MilkProperty[]
-interface Shadow {
-	shadow: "open" | "closed"
-}
-type Hooks = { type: string } | Shadow | [any, Function] | {}
+type Hooks<T, K> = { type: K } | [K, Function] | { type: string } | {}
 
 interface UseProps {
 	type: "hookProp"
@@ -20,19 +20,26 @@ interface UseEffect {
 	listener: string[]
 }
 
-export const create = (
-		execution: (display: Function, state: any, props: any) => null,
-		hooks: Hooks = {},
+export const create = <T, K extends keyof T>(
+		execution: (display: Function, state: any, props: any) => string | void,
+		hooks: Hooks<T, K> = {},
 		...properties: MilkEvent
 	) =>
 		class Milk extends HTMLElement {
-			props: any
-			state: any
-			setState: any
-			lifecycle: any
-			prevState: any
+			props: { [key: string]: any }
+			state: { [stateName: string]: Function }
+			setState: { [stateName: string]: Function }
+			lifecycle: {
+				[lifeCycleName: string]:
+					| {
+							callback(state: any, props: string | boolean | number): any
+							listener: { [key: string]: any }
+					  }
+					| {}
+			}
+			prevState: { [stateName: string]: Function }
 
-			element: ShadowRoot
+			element: Readonly<ShadowRoot>
 
 			constructor() {
 				super()
@@ -45,7 +52,13 @@ export const create = (
 
 				this.element = this.attachShadow({ mode: "closed" })
 
-				this.initialize()
+				if (
+					document.readyState === "interactive" ||
+					document.readyState === "complete"
+				)
+					this.initialize()
+				else
+					document.addEventListener("DOMContentLoaded", () => this.initialize())
 			}
 
 			static get observedAttributes() {
@@ -62,32 +75,18 @@ export const create = (
 				let attrValue = this.parseAttribute(name)
 
 				this.props[name] = attrValue
-				this.update()
+
+				if (
+					document.readyState === "interactive" ||
+					document.readyState === "complete"
+				)
+					this.update()
 
 				this.onPropsChange(name)
 			}
 
-			update() {
-				let mappedState = this.mapState()[0],
-					template = document.createElement("template")
-
-				execution(
-					(domString: string) => {
-						template.innerHTML = this.reflect(domString)
-						if (this.element.firstChild !== null)
-							while (this.element.firstChild) this.element.firstChild.remove()
-
-						this.element.appendChild(template.content.cloneNode(true))
-					},
-					mappedState,
-					this.props
-				)
-
-				this.mapEvent()
-			}
-
-			initialize() {
-				Object.entries(hooks).forEach(([name, hook]) => {
+			initialize(): void {
+				Object.entries(hooks).forEach(([name, hook]: any) => {
 					switch (hook.type) {
 						case "hookProp":
 							let attrValue = this.parseAttribute(name)
@@ -104,10 +103,44 @@ export const create = (
 							return ([this.state[name], this.setState[name]] = hook)
 					}
 				})
-				return this.update()
+
+				let observer = new MutationObserver((mutationsList, observer) =>
+					mutationsList.forEach(mutation => this.update())
+				)
+
+				observer.observe(this, {
+					childList: true,
+					characterData: true,
+					subtree: true
+				})
+
+				this.update()
 			}
 
-			onPropsChange(attributeName: string) {
+			update(): void {
+				let mappedState = this.mapState()[0],
+					template = document.createElement("template")
+
+				execution(
+					(domString: string) => {
+						template.innerHTML = this.reflect(domString)
+						if (this.element.firstChild !== null)
+							while (this.element.firstChild) this.element.firstChild.remove()
+
+						this.element.appendChild(template.content.cloneNode(true))
+					},
+					mappedState,
+					Object.assign(this.props, {
+						children: this.children.length
+							? this.children
+							: this.textContent.replace(/\n|\t|\ \ /g, "")
+					})
+				)
+
+				this.mapEvent()
+			}
+
+			onPropsChange(attributeName: string): void {
 				let mappedState = this.mapState()[0]
 
 				Object.entries(this.lifecycle).forEach(
@@ -118,7 +151,7 @@ export const create = (
 				)
 			}
 
-			callStateLifeCycle(prevState: any, state: any) {
+			callStateLifeCycle(prevState: any, state: any): void {
 				let diffState = Object.entries(state).filter(
 						([name, value]) => prevState[name] !== value
 					),
@@ -133,7 +166,9 @@ export const create = (
 				)
 			}
 
-			mapState(state = this.state) {
+			mapState(
+				state = this.state
+			): [{ [key: string]: any }, { [stateName: string]: Function }] {
 				let mappedState = Object.assign({}, state)
 
 				Object.entries(this.state).map(([name, hook]) => {
@@ -144,27 +179,31 @@ export const create = (
 				return [mappedState, this.setState]
 			}
 
-			mapEvent() {
+			mapEvent(): void {
 				let mappedState = this.mapState()
 
 				properties.map(property => {
 					let { query, event, then } = property,
-						eachEvent = Array.isArray(event) ? event : event.replace(/ /g, "").split(",")
+						eachEvent = Array.isArray(event)
+							? event
+							: event.replace(/ /g, "").split(",")
 
-					eachEvent.forEach((eventName) =>
-						this.element.querySelector(query).addEventListener(eventName, () => {
-							let prevState = this.mapState(Object.assign({}, this.state))[0]
-							then(mappedState)
-							let state = this.mapState(Object.assign({}, this.state))[0]
+					eachEvent.forEach(eventName =>
+						this.element
+							.querySelector(query)
+							.addEventListener(eventName, () => {
+								let prevState = this.mapState(Object.assign({}, this.state))[0]
+								then(mappedState)
+								let state = this.mapState(Object.assign({}, this.state))[0]
 
-							this.callStateLifeCycle(prevState, state)
-							this.update()
-						})
+								this.callStateLifeCycle(prevState, state)
+								this.update()
+							})
 					)
 				})
 			}
 
-			reflect(domString: string) {
+			reflect(domString: string): string {
 				let newDom = `${domString}`.replace(/{children}/, "<slot></slot>")
 
 				Object.entries(this.state).map(
@@ -186,11 +225,24 @@ export const create = (
 				return newDom
 			}
 
-			parseAttribute(name: string) {
-				let attrValue: string | boolean = this.getAttribute(name) || ""
+			parseAttribute(name: string): string | boolean | number {
+				let attrValue: string | boolean | number = this.getAttribute(name)
 
-				if (attrValue === "true") attrValue = true
-				else if (attrValue === "false") attrValue = false
+				switch (attrValue) {
+					case "true":
+						attrValue = true
+						break
+
+					case "false":
+						attrValue = false
+						break
+
+					default:
+						if (/^[-|+]?[0-9]*$/.test(attrValue)) {
+							let temporyValue = parseInt(attrValue, 10)
+							if (!isNaN(temporyValue)) attrValue = parseInt(attrValue, 10)
+						}
+				}
 
 				return attrValue
 			}

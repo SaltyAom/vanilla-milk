@@ -2,12 +2,13 @@
 Simple library for building simple reactive web components.
   
 ## What is...
-Vanilla Milk create component which is can be used on any view library or framework of your choice! Embrace future of web-component made it future-proof. Built-in reactive state and props but also is very small and fast.
+Vanilla Milk is a library which helps create to web component which can be used on anywhere! Embrace future of web-component made it future-proof. Built-in reactive state and props but also is very small and fast.
 
 Vanilla Milk feature:
 * Reusable component.
 * Simple way for creating web components.
 * Reactive state and props.
+* No class, just function.
 * Life-cycle hooks.
 * Expressive Vanilla like API structure.
 * Very small (1kB gzipped on production).
@@ -89,7 +90,7 @@ Just add `<milk-component></milk-component>` in HTML. Make sure you've link the 
 </html>
 ```
 And it should display something like this.
-  
+    
 #### But that's not what make Vanilla Milk special...
 In Vanilla Milk, component are reactive which mean every time `state` or `props` changed, Milk Component will know it.
 
@@ -159,8 +160,8 @@ import { create, define, useState } from "vanilla-milk"
 
 const MilkComponent = create((display, state) => {
 	return display(`
-    	<h1>Count ${state.count}</h1>
-        <button id="increase-count">Increase count</button>
+		<h1>Count ${state.count}</h1>
+    	<button id="increase-count">Increase count</button>
 	`)
 },
 {
@@ -175,8 +176,8 @@ import { create, define, useState } from "vanilla-milk"
 
 const MilkComponent = create((display, state) => {
 	return display(`
-    	<h1>Count ${state.count}</h1>
-        <button id="increase-count">Increase count</button>
+		<h1>Count ${state.count}</h1>
+    	<button id="increase-count">Increase count</button>
 	`)
 },
 {
@@ -184,9 +185,9 @@ const MilkComponent = create((display, state) => {
 },
 {
 	query: "#increase-count",
-    event: "click",
-    then: ([state, set]) => {
-    	set.count(state.count + 1)
+	event: "click",
+	then: ([state, set]) => {
+		set.count(state.count + 1)
     }
 })
 
@@ -251,8 +252,8 @@ And in HTML
 ```
 The reason we have to define `props` so that Vanilla Milk can just update and listen only to the props you used! 
   
-But there's one special props which is available... `children`
-
+But there's one special props which is always available... `children`
+Children is any text or HTML Element between the Milk Component.
 In HTML:
 ```html
 <milk-component>Hello World</milk-component>
@@ -277,7 +278,7 @@ Again, add it to second paramter of `create` like `useState` and `useProps`
 {
 	hello: useProps(),
 	logHello: useEffect((state, props) => {
-    	console.log(props.hello) // Log everytime hello changed
+		console.log(props.hello) // Log everytime hello changed
     }, ["hello"])
 }
 ```
@@ -287,6 +288,27 @@ Because we can't directly access value of hello so we just add it as string, Van
 You can express name of `useEffect` as anything, It just easier to remind you lifecycle with name if there are too much lifecycle.
 
 Now we hello is changed, first callback will run. Like view callback, useEffect is paired with `(state, props)`. You can directly access it in the callback.
+
+`useEffect` is not only limited to state but props too! You can also add `useEffect` as much as you want or many listener as much as you need!
+```javascript
+// State and Props
+{
+    hello: useProps(),
+    count: useState(),
+	logHello: useEffect((state, props) => {
+    	console.log(props)
+    }, ["count"])
+}
+  
+// Multiple listener
+{
+    hello: useProps(),
+    count: useProps(),
+	logHello: useEffect((state, props) => {
+    	console.log(props)
+    }, ["count", "count"])
+}
+```
   
 That's pretty much it of Vanilla Milk 0.1.2. :tada::tada:
 I'm looking for implement more functionality to this project soon! ps. vdom are also planned to be added in the future~ Stay tuned!

@@ -25,21 +25,22 @@ export const create = <T, K extends keyof T>(
 		hooks: Hooks<T, K> = {},
 		...properties: MilkEvent
 	) =>
-		class Milk extends HTMLElement {
+		class VanillaMilk extends HTMLElement {
 			props: { [key: string]: any }
 			state: { [stateName: string]: Function }
 			setState: { [stateName: string]: Function }
 			lifecycle: {
 				[lifeCycleName: string]:
 					| {
-							callback(state: any, props: string | boolean | number): any
+							callback(state: any, props: string | boolean | number): void
 							listener: { [key: string]: any }
 					  }
 					| {}
 			}
 			prevState: { [stateName: string]: Function }
+			observer: MutationObserver
 
-			element: Readonly<ShadowRoot>
+			element: ShadowRoot
 
 			constructor() {
 				super()
@@ -47,8 +48,8 @@ export const create = <T, K extends keyof T>(
 				this.props = []
 				this.state = {}
 				this.setState = {}
-				this.lifecycle = {}
 				this.prevState = {}
+				this.lifecycle = {}
 
 				this.element = this.attachShadow({ mode: "closed" })
 
@@ -104,11 +105,11 @@ export const create = <T, K extends keyof T>(
 					}
 				})
 
-				let observer = new MutationObserver((mutationsList, observer) =>
-					mutationsList.forEach(mutation => this.update())
+				this.observer = new MutationObserver((mutationsList, observer) =>
+					mutationsList.forEach(() => this.update())
 				)
 
-				observer.observe(this, {
+				this.observer.observe(this, {
 					childList: true,
 					characterData: true,
 					subtree: true
@@ -119,15 +120,16 @@ export const create = <T, K extends keyof T>(
 
 			update(): void {
 				let mappedState = this.mapState()[0],
-					template = document.createElement("template")
+					template = document.createElement("template"),
+					a = document.createElement("template")
 
 				execution(
 					(domString: string) => {
-						template.innerHTML = this.reflect(domString)
-						if (this.element.firstChild !== null)
-							while (this.element.firstChild) this.element.firstChild.remove()
+						template.innerHTML = domString
+						a.innerHTML = domString
+						this.mapEvent(template)
 
-						this.element.appendChild(template.content.cloneNode(true))
+						this.milkDom(this.element, template.content)
 					},
 					mappedState,
 					Object.assign(this.props, {
@@ -136,8 +138,75 @@ export const create = <T, K extends keyof T>(
 							: this.textContent.replace(/\n|\t|\ \ /g, "")
 					})
 				)
+			}
 
-				this.mapEvent()
+			milkDom(
+				displayed: ShadowRoot | Node,
+				template: HTMLTemplateElement | DocumentFragment
+			) {
+				template.childNodes.forEach(templateChild => {
+					if (
+						templateChild.nodeName === "#text" &&
+						templateChild.textContent.replace(/\t|\n|\ /g, "") === ""
+					)
+						template.removeChild(templateChild)
+				})
+
+				displayed.childNodes.forEach(displayedChild => {
+					if (
+						displayedChild.nodeName === "#text" &&
+						displayedChild.textContent.replace(/\t|\n|\ /g, "") === ""
+					)
+						displayed.removeChild(displayedChild)
+				})
+
+				let templateChild = template.childNodes,
+				displayedChild = displayed.childNodes
+
+				let diff: ChildNode[] = [],
+					textDiff: string[] = []
+
+				templateChild.forEach((templateChildNode, index) => {
+					if(templateChildNode.isEqualNode(displayedChild[index])) return;
+
+					// Check if node is the same but text is different
+					if(typeof displayedChild[index] !== "undefined"){
+						let tempNode: any = displayedChild[index].cloneNode(true)
+						tempNode.textContent = templateChildNode.textContent
+
+						if(tempNode.isEqualNode(templateChildNode))
+							return textDiff[index] = tempNode.textContent
+					}
+
+					// Compare child
+					let templateTemplate = document.createElement("template")
+
+					templateChildNode.cloneNode(true).childNodes.forEach((deepChild) => {
+						if(deepChild.nodeName === "#text") return
+
+						templateTemplate.content.appendChild(deepChild)
+					})
+
+					// If there's different node and displayed isn't blank
+					if(templateTemplate.content.childNodes.length && typeof displayed.childNodes[index] !== "undefined")
+						return this.milkDom(displayed.childNodes[index], templateTemplate.content)
+
+					diff[index] = templateChildNode
+				})
+
+				diff.forEach((newNode, index) => {
+					if(typeof displayedChild[index] === "undefined")
+						return displayed.insertBefore(newNode, displayedChild[index])
+
+					if(displayed.childNodes[index].nodeName === "#text")
+						return displayed.parentElement.replaceChild(newNode, displayed.childNodes[index].parentNode)
+
+					displayed.replaceChild(newNode, displayed.childNodes[index])
+				})
+
+				textDiff.forEach((text, index) => {
+					displayed.childNodes[index].textContent = textDiff[index]
+				})
 			}
 
 			onPropsChange(attributeName: string): void {
@@ -151,7 +220,7 @@ export const create = <T, K extends keyof T>(
 				)
 			}
 
-			callStateLifeCycle(prevState: any, state: any): void {
+			stateLifeCycle(prevState: any, state: any): void {
 				let diffState = Object.entries(state).filter(
 						([name, value]) => prevState[name] !== value
 					),
@@ -179,9 +248,7 @@ export const create = <T, K extends keyof T>(
 				return [mappedState, this.setState]
 			}
 
-			mapEvent(): void {
-				let mappedState = this.mapState()
-
+			mapEvent(template: HTMLTemplateElement): void {
 				properties.map(property => {
 					let { query, event, then } = property,
 						eachEvent = Array.isArray(event)
@@ -189,40 +256,18 @@ export const create = <T, K extends keyof T>(
 							: event.replace(/ /g, "").split(",")
 
 					eachEvent.forEach(eventName =>
-						this.element
-							.querySelector(query)
-							.addEventListener(eventName, () => {
-								let prevState = this.mapState(Object.assign({}, this.state))[0]
-								then(mappedState)
-								let state = this.mapState(Object.assign({}, this.state))[0]
+						template.content.querySelector(query).addEventListener(eventName, () => {
+							let mappedState = this.mapState(),
+								prevState = this.mapState(Object.assign({}, this.state))[0]
 
-								this.callStateLifeCycle(prevState, state)
-								this.update()
-							})
+							then(mappedState)
+							let state = this.mapState(Object.assign({}, this.state))[0]
+
+							this.stateLifeCycle(prevState, state)
+							this.update()
+						})
 					)
 				})
-			}
-
-			reflect(domString: string): string {
-				let newDom = `${domString}`.replace(/{children}/, "<slot></slot>")
-
-				Object.entries(this.state).map(
-					([name, hook]) =>
-						(newDom = newDom.replace(
-							new RegExp(`{${name}}`, "g"),
-							this.state[name]()
-						))
-				)
-
-				Object.entries(this.props).map(
-					([name, hook]) =>
-						(newDom = newDom.replace(
-							new RegExp(`{${name}}`, "g"),
-							this.props[name]
-						))
-				)
-
-				return newDom
 			}
 
 			parseAttribute(name: string): string | boolean | number {
@@ -247,7 +292,7 @@ export const create = <T, K extends keyof T>(
 				return attrValue
 			}
 		},
-	define = (tagName: string, className: any) =>
+	define = (tagName: string, className: ReturnType<typeof create>) =>
 		customElements.define(tagName, className),
 	useState = (initValue: any) => {
 		let _value = initValue,
@@ -269,3 +314,13 @@ export const create = <T, K extends keyof T>(
 			listener: listener
 		}
 	}
+
+const vanillaMilk = {
+	create: create,
+	define: define,
+	useState,
+	useProps,
+	useEffect
+}
+
+export default vanillaMilk

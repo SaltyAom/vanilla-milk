@@ -7,6 +7,7 @@ Vanilla Milk is a library which helps create to web component which can be used 
 Vanilla Milk feature:
 * Reusable component.
 * Simple way for creating web components.
+* Milk DOM, update only neccessary.
 * Reactive state and props.
 * No class, just function.
 * Life-cycle hooks.
@@ -16,6 +17,11 @@ Vanilla Milk feature:
 * Zero dependencies.
 * TypeScript support.
 
+## Milk DOM
+Vanilla Milk doesn't use Virtual DOM, instead it Milk DOM which share the same idea with Virtual Dom, update where neccessary. Unlike VDOM, Milk DOM use a collection of Native Browser API to perform diffing instead of creating long list of object which also prevent heavy recursion.
+Drawback is diffing algorithm isn't as deep as Virtual DOM does but Milk DOM is blazing fast and has less memory consumption.
+###### Note: Milk DOM is in an very early stage of development, you might experience some bug and when that time came, you can always open the issue on this repo.
+  
 ## Getting started
 Glad you're interested in! Let's get over quick start! Let us add library just for creating a component, after the component has been built, you don't have to install it anymore! Just moved the built components to your any project~
 

@@ -1,14 +1,14 @@
 interface MilkProperty {
 	query: string
 	event: string | string[]
-	then([state, set]: any): void
+	then([state, set]: [
+		{ [key: string]: any },
+		{ [stateName: string]: Function }
+	]): void
 }
 
 type MilkEvent = MilkProperty[]
-interface Shadow {
-	shadow: "open" | "closed"
-}
-type Hooks = { type: string } | Shadow | [any, Function] | {}
+type Hooks<T, K> = { type: K } | [K, Function] | { type: string } | {}
 
 interface UseProps {
 	type: "hookProp"
@@ -20,17 +20,26 @@ interface UseEffect {
 	listener: string[]
 }
 
-export const create = (
-		execution: (display: Function, state: any, props: any) => null,
-		hooks: Hooks = {},
+export const create = <T, K extends keyof T>(
+		execution: (display: Function, state: any, props: any) => string | void,
+		hooks: Hooks<T, K> = {},
 		...properties: MilkEvent
 	) =>
-		class Milk extends HTMLElement {
-			props: any
-			state: any
-			setState: any
-			lifecycle: any
-			prevState: any
+		class VanillaMilk extends HTMLElement {
+			props: { [key: string]: any }
+			state: { [stateName: string]: Function }
+			setState: { [stateName: string]: Function }
+			lifecycle: {
+				[lifeCycleName: string]:
+					| {
+							callback(state: any, props: string | boolean | number): void
+							listener: { [key: string]: any }
+					  }
+					| {}
+			}
+			prevState: { [stateName: string]: Function }
+			observer: MutationObserver
+			children: HTMLCollection
 
 			element: ShadowRoot
 
@@ -40,12 +49,18 @@ export const create = (
 				this.props = []
 				this.state = {}
 				this.setState = {}
-				this.lifecycle = {}
 				this.prevState = {}
+				this.lifecycle = {}
 
 				this.element = this.attachShadow({ mode: "closed" })
 
-				this.initialize()
+				if (
+					document.readyState === "interactive" ||
+					document.readyState === "complete"
+				)
+					this.initialize()
+				else
+					document.addEventListener("DOMContentLoaded", () => this.initialize())
 			}
 
 			static get observedAttributes() {
@@ -62,32 +77,18 @@ export const create = (
 				let attrValue = this.parseAttribute(name)
 
 				this.props[name] = attrValue
-				this.update()
+
+				if (
+					document.readyState === "interactive" ||
+					document.readyState === "complete"
+				)
+					this.update()
 
 				this.onPropsChange(name)
 			}
 
-			update() {
-				let mappedState = this.mapState()[0],
-					template = document.createElement("template")
-
-				execution(
-					(domString: string) => {
-						template.innerHTML = this.reflect(domString)
-						if (this.element.firstChild !== null)
-							while (this.element.firstChild) this.element.firstChild.remove()
-
-						this.element.appendChild(template.content.cloneNode(true))
-					},
-					mappedState,
-					this.props
-				)
-
-				this.mapEvent()
-			}
-
-			initialize() {
-				Object.entries(hooks).forEach(([name, hook]) => {
+			initialize(): void {
+				Object.entries(hooks).forEach(([name, hook]: any) => {
 					switch (hook.type) {
 						case "hookProp":
 							let attrValue = this.parseAttribute(name)
@@ -104,10 +105,147 @@ export const create = (
 							return ([this.state[name], this.setState[name]] = hook)
 					}
 				})
-				return this.update()
+
+				this.observer = new MutationObserver((mutationsList, observer) =>
+					mutationsList.forEach(() => this.update())
+				)
+
+				this.observer.observe(this, {
+					childList: true,
+					characterData: true,
+					subtree: true
+				})
+
+				this.update()
 			}
 
-			onPropsChange(attributeName: string) {
+			update(): void {
+				let mappedState = this.mapState()[0],
+					template = document.createElement("template"),
+					children = new String()
+
+				Array.from(this.children).forEach(
+					(node: any) => (children += node.outerHTML)
+				)
+
+				execution(
+					(domString: string) => {
+						template.innerHTML = domString
+						this.mapEvent(template)
+
+						this.milkDom(this.element, template.content)
+					},
+					mappedState,
+					Object.assign(this.props, {
+						children: this.children.length
+							? children
+							: this.textContent.replace(/\n|\t|\ \ /g, "")
+					})
+				)
+			}
+
+			milkDom(
+				displayed: ShadowRoot | Node,
+				template: HTMLTemplateElement | DocumentFragment
+			) {
+				template.childNodes.forEach(templateChild => {
+					if (
+						templateChild.nodeName === "#text" &&
+						templateChild.textContent.replace(/\t|\n|\ /g, "") === ""
+					)
+						template.removeChild(templateChild)
+				})
+
+				displayed.childNodes.forEach(displayedChild => {
+					if (
+						displayedChild.nodeName === "#text" &&
+						displayedChild.textContent.replace(/\t|\n|\ /g, "") === ""
+					)
+						displayed.removeChild(displayedChild)
+				})
+
+				let templateChild = template.childNodes,
+					displayedChild = displayed.childNodes
+
+				let diff: ChildNode[] = [],
+					textDiff: string[] = [],
+					hardDiff: ChildNode[] = []
+
+				templateChild.forEach((templateChildNode, index) => {
+					if (templateChildNode.isEqualNode(displayedChild[index])) return
+
+					// Check if node is the same but text is different
+					if (typeof displayedChild[index] !== "undefined") {
+						let tempNode: any = displayedChild[index].cloneNode(true)
+						tempNode.textContent = templateChildNode.textContent
+
+						if (tempNode.isEqualNode(templateChildNode))
+							return (textDiff[index] = tempNode.textContent)
+					}
+
+					// Hard diff
+					if (
+						typeof displayedChild[index] !== "undefined" &&
+						templateChildNode.nodeName !== displayedChild[index].nodeName
+					)
+						return (hardDiff[index] = templateChildNode)
+
+					// Compare child
+					let templateTemplate = new DocumentFragment()
+
+					templateChildNode
+						.cloneNode(true)
+						.childNodes.forEach((deepChild, index) => {
+							if (
+								deepChild.nodeName === "#text" &&
+								deepChild.textContent.replace(/\t|\n|\ /g, "") === ""
+							)
+								return
+
+							templateTemplate.appendChild(deepChild)
+						})
+
+					// If there's different node and displayed isn't blank
+					if (
+						templateTemplate.childNodes.length &&
+						typeof displayed.childNodes[index] !== "undefined"
+					)
+						return this.milkDom(displayed.childNodes[index], templateTemplate)
+
+					diff[index] = templateChildNode
+				})
+
+				// Diff
+				hardDiff.forEach((newNode, index) => {
+					displayed.replaceChild(newNode, displayedChild[index])
+				})
+
+				diff.forEach((newNode, index) => {
+					if (typeof displayedChild[index] === "undefined")
+						return displayed.insertBefore(newNode, displayedChild[index])
+
+					if (displayed.childNodes[index].nodeName === "#text")
+						return displayed.parentNode.replaceChild(
+							newNode,
+							displayed.parentNode.childNodes[index]
+						)
+
+					displayed.replaceChild(newNode, displayed.childNodes[index])
+				})
+
+				if (diff.length > displayedChild.length)
+					displayedChild.forEach((displayedNode, index) => {
+						if (index >= diff.length) return
+
+						displayed.removeChild(displayedChild[index + 1])
+					})
+
+				textDiff.forEach((text, index) => {
+					displayed.childNodes[index].textContent = textDiff[index]
+				})
+			}
+
+			onPropsChange(attributeName: string): void {
 				let mappedState = this.mapState()[0]
 
 				Object.entries(this.lifecycle).forEach(
@@ -118,7 +256,7 @@ export const create = (
 				)
 			}
 
-			callStateLifeCycle(prevState: any, state: any) {
+			stateLifeCycle(prevState: any, state: any): void {
 				let diffState = Object.entries(state).filter(
 						([name, value]) => prevState[name] !== value
 					),
@@ -133,7 +271,9 @@ export const create = (
 				)
 			}
 
-			mapState(state = this.state) {
+			mapState(
+				state = this.state
+			): [{ [key: string]: any }, { [stateName: string]: Function }] {
 				let mappedState = Object.assign({}, state)
 
 				Object.entries(this.state).map(([name, hook]) => {
@@ -144,58 +284,53 @@ export const create = (
 				return [mappedState, this.setState]
 			}
 
-			mapEvent() {
-				let mappedState = this.mapState()
-
+			mapEvent(template: HTMLTemplateElement): void {
 				properties.map(property => {
 					let { query, event, then } = property,
-						eachEvent = Array.isArray(event) ? event : event.replace(/ /g, "").split(",")
+						eachEvent = Array.isArray(event)
+							? event
+							: event.replace(/ /g, "").split(",")
 
-					eachEvent.forEach((eventName) =>
-						this.element.querySelector(query).addEventListener(eventName, () => {
-							let prevState = this.mapState(Object.assign({}, this.state))[0]
-							then(mappedState)
-							let state = this.mapState(Object.assign({}, this.state))[0]
+					eachEvent.forEach(eventName =>
+						template.content
+							.querySelector(query)
+							.addEventListener(eventName, () => {
+								let mappedState = this.mapState(),
+									prevState = this.mapState(Object.assign({}, this.state))[0]
 
-							this.callStateLifeCycle(prevState, state)
-							this.update()
-						})
+								then(mappedState)
+								let state = this.mapState(Object.assign({}, this.state))[0]
+
+								this.stateLifeCycle(prevState, state)
+								this.update()
+							})
 					)
 				})
 			}
 
-			reflect(domString: string) {
-				let newDom = `${domString}`.replace(/{children}/, "<slot></slot>")
+			parseAttribute(name: string): string | boolean | number {
+				let attrValue: string | boolean | number = this.getAttribute(name)
 
-				Object.entries(this.state).map(
-					([name, hook]) =>
-						(newDom = newDom.replace(
-							new RegExp(`{${name}}`, "g"),
-							this.state[name]()
-						))
-				)
+				switch (attrValue) {
+					case "true":
+						attrValue = true
+						break
 
-				Object.entries(this.props).map(
-					([name, hook]) =>
-						(newDom = newDom.replace(
-							new RegExp(`{${name}}`, "g"),
-							this.props[name]
-						))
-				)
+					case "false":
+						attrValue = false
+						break
 
-				return newDom
-			}
-
-			parseAttribute(name: string) {
-				let attrValue: string | boolean = this.getAttribute(name) || ""
-
-				if (attrValue === "true") attrValue = true
-				else if (attrValue === "false") attrValue = false
+					default:
+						if (/^[-|+]?[0-9]*$/.test(attrValue)) {
+							let temporyValue = parseInt(attrValue, 10)
+							if (!isNaN(temporyValue)) attrValue = parseInt(attrValue, 10)
+						}
+				}
 
 				return attrValue
 			}
 		},
-	define = (tagName: string, className: any) =>
+	define = (tagName: string, className: ReturnType<typeof create>) =>
 		customElements.define(tagName, className),
 	useState = (initValue: any) => {
 		let _value = initValue,
@@ -217,3 +352,13 @@ export const create = (
 			listener: listener
 		}
 	}
+
+const vanillaMilk = {
+	create: create,
+	define: define,
+	useState,
+	useProps,
+	useEffect
+}
+
+export default vanillaMilk

@@ -7,7 +7,7 @@ Vanilla Milk is a library which helps create to web component which can be used 
 Vanilla Milk feature:
 * Reusable component.
 * Simple way for creating web components.
-* Milk DOM, update only neccessary.
+* Milk DOM, a special implementation of DOM manipulation.
 * Reactive state and props.
 * No class, just function.
 * Life-cycle hooks.
@@ -314,6 +314,95 @@ Now we hello is changed, first callback will run. Like view callback, useEffect 
     	console.log(props)
     }, ["count", "count"])
 }
+```
+  
+## Milk DOM In depth
+Milk DOM cover a lot of thing under the cover but the main concept is to compare and diff DOM Node aimming for lesser iteration as possible (Same idea with VDOM). Instead of constructing an object node representation of DOM for comparing between two. Vanilla Milk heavily use Native Browser API comparing between each node instead of DOM and update it directly instead.
+But the DOM is hard to be maintained and manipulated, Vanilla Milk is good at comparing between each DOM Node but not where textNode are contained in.
+
+Milk DOM's diffing algorithm are seperated into 3 parts.
+* Diff - Diffing for the different attribute, child node, etc.
+* Hard Diff - When tagName are different, whole element node have to be replaced. Hard Diff take care of that preventing child node for being recursion.
+* Text Diff - Diffing for text different.
+#### Since Milk DOM is new concept for Vanilla Milk, some guideline might change in the future.
+  
+### Best practice
+To prevent an unexpected update, it's recommend to contained textNode in an element where textNode is state.
+```javascript
+import { create, useState } from "vanilla-milk"
+
+// Please don't
+let notSoGood = create((display, { counter }) => {
+	return display(`
+		<section>
+			<h1>Counter: </h1>
+			{counter}
+		</section>
+	`)
+})
+
+// Better~
+let wellDone = create((display) => {
+	return display(`
+		<section>
+			<h1>
+				Counter: {state}
+			</h1>
+		</section>
+	`)
+})
+```
+Not only that storing textNode in an element are safer but also has better performance from prevent recursion between each node.
+  
+### Multiple node on root
+Unlike VDOM, Vanilla Milk use native DOM for diffing freeing root node from stucking with only one node on the top.
+
+```javascript
+import { create } from "vanilla-milk"
+
+// This is ok
+let multipleRootNode = create((display, { counter }) => {
+	return display(`
+		<h1>Hello! I'm the root node!</h1>
+		<h2>No way! I'm the root node too!</h2>
+		<p>It's ok to use multiple root node in Vanilla Milk</p>
+	`)
+})
+```
+
+## Encapsulation
+Vanilla Milk use Shadow DOM to encapsulate logic and style. Preventing an unexpected change while working in multiple library.
+  
+To use external stylesheet in Milk Component, you can assign stylesheet in the component instead
+```javascript
+import { create } from "vanilla-milk"
+
+// Link stylesheet in component.
+let coolCard = create((display, { counter }) => {
+	return display(`
+		<link rel="stylesheet" href="/css/card.css">
+		<div class="card">
+		</div>
+	`)
+})
+
+// Or even define style tag inside
+let coolCard = create(
+	(display) => display(`
+		<style>
+			.card {
+				display: flex;
+				flex-direction: column;
+				width: 300px;
+				padding: 20px 12px;
+				borderRadius: 4px;
+				box-shadow: 0 4px 8px rgba(0,0,0,.25);
+			}
+		</style>
+		<div class="card">
+		</div>
+	`)
+)
 ```
   
 That's pretty much it of Vanilla Milk 0.1.2. :tada::tada:

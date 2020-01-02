@@ -39,6 +39,7 @@ export const create = <T, K extends keyof T>(
 			}
 			prevState: { [stateName: string]: Function }
 			observer: MutationObserver
+			children: HTMLCollection
 
 			element: ShadowRoot
 
@@ -121,12 +122,15 @@ export const create = <T, K extends keyof T>(
 			update(): void {
 				let mappedState = this.mapState()[0],
 					template = document.createElement("template"),
-					a = document.createElement("template")
+					children = new String()
+
+				Array.from(this.children).forEach(
+					(node: any) => (children += node.outerHTML)
+				)
 
 				execution(
 					(domString: string) => {
 						template.innerHTML = domString
-						a.innerHTML = domString
 						this.mapEvent(template)
 
 						this.milkDom(this.element, template.content)
@@ -134,7 +138,7 @@ export const create = <T, K extends keyof T>(
 					mappedState,
 					Object.assign(this.props, {
 						children: this.children.length
-							? this.children
+							? children
 							: this.textContent.replace(/\n|\t|\ \ /g, "")
 					})
 				)
@@ -179,6 +183,7 @@ export const create = <T, K extends keyof T>(
 							return (textDiff[index] = tempNode.textContent)
 					}
 
+					// Hard diff
 					if (
 						typeof displayedChild[index] !== "undefined" &&
 						templateChildNode.nodeName !== displayedChild[index].nodeName
@@ -186,27 +191,31 @@ export const create = <T, K extends keyof T>(
 						return (hardDiff[index] = templateChildNode)
 
 					// Compare child
-					let templateTemplate = document.createElement("template")
+					let templateTemplate = new DocumentFragment()
 
-					templateChildNode.cloneNode(true).childNodes.forEach(deepChild => {
-						if (deepChild.nodeName === "#text") return
+					templateChildNode
+						.cloneNode(true)
+						.childNodes.forEach((deepChild, index) => {
+							if (
+								deepChild.nodeName === "#text" &&
+								deepChild.textContent.replace(/\t|\n|\ /g, "") === ""
+							)
+								return
 
-						templateTemplate.content.appendChild(deepChild)
-					})
+							templateTemplate.appendChild(deepChild)
+						})
 
 					// If there's different node and displayed isn't blank
 					if (
-						templateTemplate.content.childNodes.length &&
+						templateTemplate.childNodes.length &&
 						typeof displayed.childNodes[index] !== "undefined"
 					)
-						return this.milkDom(
-							displayed.childNodes[index],
-							templateTemplate.content
-						)
+						return this.milkDom(displayed.childNodes[index], templateTemplate)
 
 					diff[index] = templateChildNode
 				})
 
+				// Diff
 				hardDiff.forEach((newNode, index) => {
 					displayed.replaceChild(newNode, displayedChild[index])
 				})

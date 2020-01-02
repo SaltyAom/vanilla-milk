@@ -161,48 +161,61 @@ export const create = <T, K extends keyof T>(
 				})
 
 				let templateChild = template.childNodes,
-				displayedChild = displayed.childNodes
+					displayedChild = displayed.childNodes
 
 				let diff: ChildNode[] = [],
 					textDiff: string[] = []
 
 				templateChild.forEach((templateChildNode, index) => {
-					if(templateChildNode.isEqualNode(displayedChild[index])) return;
+					if (templateChildNode.isEqualNode(displayedChild[index])) return
 
 					// Check if node is the same but text is different
-					if(typeof displayedChild[index] !== "undefined"){
+					if (typeof displayedChild[index] !== "undefined") {
 						let tempNode: any = displayedChild[index].cloneNode(true)
 						tempNode.textContent = templateChildNode.textContent
 
-						if(tempNode.isEqualNode(templateChildNode))
-							return textDiff[index] = tempNode.textContent
+						if (tempNode.isEqualNode(templateChildNode))
+							return (textDiff[index] = tempNode.textContent)
 					}
 
 					// Compare child
 					let templateTemplate = document.createElement("template")
 
-					templateChildNode.cloneNode(true).childNodes.forEach((deepChild) => {
-						if(deepChild.nodeName === "#text") return
+					templateChildNode.cloneNode(true).childNodes.forEach(deepChild => {
+						if (deepChild.nodeName === "#text") return
 
 						templateTemplate.content.appendChild(deepChild)
 					})
 
 					// If there's different node and displayed isn't blank
-					if(templateTemplate.content.childNodes.length && typeof displayed.childNodes[index] !== "undefined")
-						return this.milkDom(displayed.childNodes[index], templateTemplate.content)
+					if (
+						templateTemplate.content.childNodes.length &&
+						typeof displayed.childNodes[index] !== "undefined"
+					)
+						return this.milkDom(
+							displayed.childNodes[index],
+							templateTemplate.content
+						)
 
 					diff[index] = templateChildNode
 				})
 
 				diff.forEach((newNode, index) => {
-					if(typeof displayedChild[index] === "undefined")
+					if (typeof displayedChild[index] === "undefined")
 						return displayed.insertBefore(newNode, displayedChild[index])
 
-					if(displayed.childNodes[index].nodeName === "#text")
-						return displayed.parentElement.replaceChild(newNode, displayed.childNodes[index].parentNode)
+					if (displayed.childNodes[index].nodeName === "#text")
+						return displayed.parentNode.replaceChild(newNode, displayed.parentNode.childNodes[index])
 
 					displayed.replaceChild(newNode, displayed.childNodes[index])
 				})
+
+				if (diff.length < displayedChild.length)
+					displayedChild.forEach((displayedNode, index) => {
+						if (index + 1 >= diff.length) return
+
+						displayed.removeChild(displayedChild[index + 1])
+					})
 
 				textDiff.forEach((text, index) => {
 					displayed.childNodes[index].textContent = textDiff[index]
@@ -256,16 +269,18 @@ export const create = <T, K extends keyof T>(
 							: event.replace(/ /g, "").split(",")
 
 					eachEvent.forEach(eventName =>
-						template.content.querySelector(query).addEventListener(eventName, () => {
-							let mappedState = this.mapState(),
-								prevState = this.mapState(Object.assign({}, this.state))[0]
+						template.content
+							.querySelector(query)
+							.addEventListener(eventName, () => {
+								let mappedState = this.mapState(),
+									prevState = this.mapState(Object.assign({}, this.state))[0]
 
-							then(mappedState)
-							let state = this.mapState(Object.assign({}, this.state))[0]
+								then(mappedState)
+								let state = this.mapState(Object.assign({}, this.state))[0]
 
-							this.stateLifeCycle(prevState, state)
-							this.update()
-						})
+								this.stateLifeCycle(prevState, state)
+								this.update()
+							})
 					)
 				})
 			}

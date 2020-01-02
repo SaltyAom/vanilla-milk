@@ -164,7 +164,8 @@ export const create = <T, K extends keyof T>(
 					displayedChild = displayed.childNodes
 
 				let diff: ChildNode[] = [],
-					textDiff: string[] = []
+					textDiff: string[] = [],
+					hardDiff: ChildNode[] = []
 
 				templateChild.forEach((templateChildNode, index) => {
 					if (templateChildNode.isEqualNode(displayedChild[index])) return
@@ -177,6 +178,12 @@ export const create = <T, K extends keyof T>(
 						if (tempNode.isEqualNode(templateChildNode))
 							return (textDiff[index] = tempNode.textContent)
 					}
+
+					if (
+						typeof displayedChild[index] !== "undefined" &&
+						templateChildNode.nodeName !== displayedChild[index].nodeName
+					)
+						return (hardDiff[index] = templateChildNode)
 
 					// Compare child
 					let templateTemplate = document.createElement("template")
@@ -200,19 +207,26 @@ export const create = <T, K extends keyof T>(
 					diff[index] = templateChildNode
 				})
 
+				hardDiff.forEach((newNode, index) => {
+					displayed.replaceChild(newNode, displayedChild[index])
+				})
+
 				diff.forEach((newNode, index) => {
 					if (typeof displayedChild[index] === "undefined")
 						return displayed.insertBefore(newNode, displayedChild[index])
 
 					if (displayed.childNodes[index].nodeName === "#text")
-						return displayed.parentNode.replaceChild(newNode, displayed.parentNode.childNodes[index])
+						return displayed.parentNode.replaceChild(
+							newNode,
+							displayed.parentNode.childNodes[index]
+						)
 
 					displayed.replaceChild(newNode, displayed.childNodes[index])
 				})
 
-				if (diff.length < displayedChild.length)
+				if (diff.length > displayedChild.length)
 					displayedChild.forEach((displayedNode, index) => {
-						if (index + 1 >= diff.length) return
+						if (index >= diff.length) return
 
 						displayed.removeChild(displayedChild[index + 1])
 					})

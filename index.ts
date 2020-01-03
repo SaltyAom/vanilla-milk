@@ -40,6 +40,12 @@ export const create = <T, K extends keyof T>(
 			prevState: { [stateName: string]: Function }
 			observer: MutationObserver
 			children: HTMLCollection
+			stylesheet: {
+				isLoaded: boolean
+				totalLoaded: number
+				source: string[]
+				element: HTMLHeadElement
+			}
 
 			element: ShadowRoot
 
@@ -51,6 +57,12 @@ export const create = <T, K extends keyof T>(
 				this.setState = {}
 				this.prevState = {}
 				this.lifecycle = {}
+				this.stylesheet = {
+					isLoaded: false,
+					totalLoaded: 0,
+					source: [],
+					element: null
+				}
 
 				this.element = this.attachShadow({ mode: "closed" })
 
@@ -101,10 +113,26 @@ export const create = <T, K extends keyof T>(
 								listener: hook.listener
 							})
 
+						case "hookStyleSheet":
+							let styleSheetNode = document.createElement("head")
+							hook.stylesheets.forEach((source: string) => {
+								let link = document.createElement("link")
+								link.setAttribute("rel", "stylesheet")
+								link.setAttribute("href", source)
+
+								this.stylesheet.source.push(source)
+								styleSheetNode.appendChild(link)
+							})
+							return (this.stylesheet.element = styleSheetNode)
+
 						default:
 							return ([this.state[name], this.setState[name]] = hook)
 					}
 				})
+
+				if (this.stylesheet.source.length) {
+					this.style.display = "none"
+				}
 
 				this.observer = new MutationObserver((mutationsList, observer) =>
 					mutationsList.forEach(() => this.update())
@@ -128,9 +156,23 @@ export const create = <T, K extends keyof T>(
 					(node: any) => (children += node.outerHTML)
 				)
 
+				let stylesheet = this.stylesheet.element.cloneNode(true)
+
+				/* Skip event listener if all stylesheet is loaded */
+				if(!this.stylesheet.isLoaded)
+					stylesheet.childNodes.forEach(
+						(doc: HTMLElement, index) =>
+							(doc.onload = () => this.onStylesheetLoaded())
+					)
+
 				execution(
 					(domString: string) => {
 						template.innerHTML = domString
+						template.content.insertBefore(
+							stylesheet,
+							template.content.childNodes[0]
+						)
+
 						this.mapEvent(template)
 
 						this.milkDom(this.element, template.content)
@@ -146,8 +188,10 @@ export const create = <T, K extends keyof T>(
 
 			milkDom(
 				displayed: ShadowRoot | Node,
-				template: HTMLTemplateElement | DocumentFragment
+				template: HTMLTemplateElement | DocumentFragment,
+				log = false
 			) {
+				/* Remove blank tab and space from template string */
 				template.childNodes.forEach(templateChild => {
 					if (
 						templateChild.nodeName === "#text" &&
@@ -171,12 +215,12 @@ export const create = <T, K extends keyof T>(
 					textDiff: string[] = [],
 					hardDiff: ChildNode[] = []
 
-				templateChild.forEach((templateChildNode, index) => {
+				templateChild.forEach((templateChildNode: HTMLElement, index) => {
 					if (templateChildNode.isEqualNode(displayedChild[index])) return
 
 					// Check if node is the same but text is different
 					if (typeof displayedChild[index] !== "undefined") {
-						let tempNode: any = displayedChild[index].cloneNode(true)
+						let tempNode: Node = displayedChild[index].cloneNode(true)
 						tempNode.textContent = templateChildNode.textContent
 
 						if (tempNode.isEqualNode(templateChildNode))
@@ -193,30 +237,31 @@ export const create = <T, K extends keyof T>(
 					// Compare child
 					let templateTemplate = new DocumentFragment()
 
-					templateChildNode
-						.cloneNode(true)
-						.childNodes.forEach((deepChild, index) => {
-							if (
-								deepChild.nodeName === "#text" &&
-								deepChild.textContent.replace(/\t|\n|\ /g, "") === ""
-							)
-								return
+					templateChildNode.cloneNode(true).childNodes.forEach(deepChild => {
+						if (deepChild.nodeName === "#text") return
 
-							templateTemplate.appendChild(deepChild)
-						})
+						templateTemplate.appendChild(deepChild)
+					})
 
 					// If there's different node and displayed isn't blank
 					if (
 						templateTemplate.childNodes.length &&
 						typeof displayed.childNodes[index] !== "undefined"
 					)
-						return this.milkDom(displayed.childNodes[index], templateTemplate)
+						return this.milkDom(
+							displayed.childNodes[index],
+							templateTemplate,
+							true
+						)
 
 					diff[index] = templateChildNode
 				})
 
 				// Diff
-				hardDiff.forEach((newNode, index) => {
+				hardDiff.forEach((newNode: HTMLElement, index) => {
+					if (newNode.getAttribute("@hidden") === "")
+						return displayed.removeChild(displayedChild[index])
+
 					displayed.replaceChild(newNode, displayedChild[index])
 				})
 
@@ -329,6 +374,14 @@ export const create = <T, K extends keyof T>(
 
 				return attrValue
 			}
+
+			onStylesheetLoaded() {
+				if (++this.stylesheet.totalLoaded !== this.stylesheet.source.length)
+					return
+
+				this.style.display = null
+				this.stylesheet.isLoaded = true
+			}
 		},
 	define = (tagName: string, className: ReturnType<typeof create>) =>
 		customElements.define(tagName, className),
@@ -345,13 +398,15 @@ export const create = <T, K extends keyof T>(
 	useEffect = (
 		callback: (state: any, props: any) => void,
 		listener: string[]
-	): UseEffect => {
-		return {
-			type: "hookLifecycle",
-			callback: callback,
-			listener: listener
-		}
-	}
+	): UseEffect => ({
+		type: "hookLifecycle",
+		callback: callback,
+		listener: listener
+	}),
+	useStyleSheet = (...stylesheets: string[]) => ({
+		type: "hookStyleSheet",
+		stylesheets: stylesheets
+	})
 
 const vanillaMilk = {
 	create: create,

@@ -18,7 +18,7 @@ Vanilla Milk feature:
 * TypeScript support.
 
 ## Milk DOM
-Vanilla Milk doesn't use Virtual DOM, instead it Milk DOM which share the same idea with Virtual Dom, update where neccessary. Unlike VDOM, Milk DOM use a collection of Native Browser API to perform diffing instead of creating long list of object which also prevent heavy recursion.
+Vanilla Milk doesn't use Virtual DOM, instead it has its own `Milk DOM` which share the same idea with Virtual Dom, update where neccessary. Unlike VDOM, Milk DOM use a collection of Native Browser API to perform diffing instead of creating long list of object which also prevent heavy recursion.
 Drawback is diffing algorithm isn't as deep as Virtual DOM does but Milk DOM is blazing fast and has less memory consumption.
 ###### Note: Milk DOM is in an very early stage of development, you might experience some bug and when that time came, you can always open the issue on this repo.
   

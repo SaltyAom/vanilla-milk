@@ -1,13 +1,3 @@
-interface MilkProperty {
-	query: string
-	event: string | string[]
-	then([state, set]: [
-		{ [key: string]: any },
-		{ [stateName: string]: Function }
-	]): void
-}
-
-type MilkEvent = MilkProperty[]
 type Hooks<T, K> = { type: K } | [K, Function] | { type: string } | {}
 
 interface UseProps {
@@ -21,9 +11,14 @@ interface UseEffect {
 }
 
 export const create = <T, K extends keyof T>(
-		execution: (display: Function, state: any, props: any) => string | void,
+		execution: (
+			display: Function,
+			state: any,
+			props: any,
+			events: { [key: string]: string }
+		) => string | void,
 		hooks: Hooks<T, K> = {},
-		...properties: MilkEvent
+		useEvents?: ([set, state]: any, props: any) => any
 	) =>
 		class VanillaMilk extends HTMLElement {
 			props: { [key: string]: any }
@@ -38,6 +33,7 @@ export const create = <T, K extends keyof T>(
 					| {}
 			}
 			prevState: { [stateName: string]: Function }
+			events: { [key: string]: string }
 			observer: MutationObserver
 			children: HTMLCollection
 			stylesheet: {
@@ -115,6 +111,7 @@ export const create = <T, K extends keyof T>(
 
 						case "hookStyleSheet":
 							let styleSheetNode = document.createElement("head")
+							styleSheetNode.setAttribute("id", "__vanilla_milk_stylesheet__")
 							hook.stylesheets.forEach((source: string) => {
 								let link = document.createElement("link")
 								link.setAttribute("rel", "stylesheet")
@@ -130,13 +127,11 @@ export const create = <T, K extends keyof T>(
 					}
 				})
 
-				if (this.stylesheet.source.length) {
-					this.style.display = "none"
-				}
-
-				this.observer = new MutationObserver((mutationsList, observer) =>
+				this.observer = new MutationObserver(mutationsList =>
 					mutationsList.forEach(() => this.update())
 				)
+
+				this.events = useEvents(this.mapState(), this.props)
 
 				this.observer.observe(this, {
 					childList: true,
@@ -158,42 +153,49 @@ export const create = <T, K extends keyof T>(
 
 				let stylesheet = this.stylesheet.element.cloneNode(true)
 
-				/* Skip event listener if all stylesheet is loaded */
-				if(!this.stylesheet.isLoaded)
-					stylesheet.childNodes.forEach(
-						(doc: HTMLElement, index) =>
-							(doc.onload = () => this.onStylesheetLoaded())
-					)
+				let eventEntries: any = {}
+
+				Object.keys(this.events).forEach(eventName => {
+					eventEntries[eventName] = eventName
+				})
 
 				execution(
 					(domString: string) => {
-						template.innerHTML = domString.replace(/__hidden__/g, `class="__vanilla_milk_hidden__"`)
+						let [parsedDomString, eventMap]: any = this.parsedDomString(
+							domString
+                        )
+
+                        template.innerHTML = parsedDomString
+                        
 						template.content.insertBefore(
 							stylesheet,
 							template.content.childNodes[0]
 						)
 
-						this.mapEvent(template)
-
+                        this.mapEvent(template, eventMap)
+                        
 						this.milkDom(this.element, template.content)
 
-						this.element.querySelectorAll(".__vanilla_milk_hidden__").forEach((node) => {
-							node.parentNode.removeChild(node)
-						})
+                        /* Clean up */
+						this.element
+							.querySelectorAll(".__vanilla_milk_hidden__")
+							.forEach(node => {
+								node.parentNode.removeChild(node)
+                            })
 					},
 					mappedState,
 					Object.assign(this.props, {
 						children: this.children.length
 							? children
 							: this.textContent.replace(/\n|\t|\ \ /g, "")
-					})
+					}),
+					eventEntries
 				)
 			}
 
 			milkDom(
 				displayed: ShadowRoot | Node,
-				template: HTMLTemplateElement | DocumentFragment,
-				log = false
+				template: HTMLTemplateElement | DocumentFragment
 			) {
 				/* Remove blank tab and space from template string */
 				template.childNodes.forEach(templateChild => {
@@ -252,11 +254,7 @@ export const create = <T, K extends keyof T>(
 						templateTemplate.childNodes.length &&
 						typeof displayed.childNodes[index] !== "undefined"
 					)
-						return this.milkDom(
-							displayed.childNodes[index],
-							templateTemplate,
-							true
-						)
+						return this.milkDom(displayed.childNodes[index], templateTemplate)
 
 					diff[index] = templateChildNode
 				})
@@ -292,6 +290,78 @@ export const create = <T, K extends keyof T>(
 				textDiff.forEach((text, index) => {
 					displayed.childNodes[index].textContent = textDiff[index]
 				})
+			}
+
+			mapEvent(template: HTMLTemplateElement, eventMap: []) {
+				eventMap.forEach(({ event, invoke }, index) => {
+					let eventNode = template.content.getElementById(
+						`__vanilla_milk_event_${index}__`
+					)
+
+					eventNode.addEventListener(event, () => {
+						let mappedEvent = useEvents(
+								this.mapState(),
+								this.props
+							),
+							prevState = this.mapState(Object.assign({}, this.state))[0]
+
+						mappedEvent[invoke]()
+
+						let state = this.mapState(Object.assign({}, this.state))[0]
+
+						this.stateLifeCycle(prevState, state)
+						this.update()
+					})
+
+					let tempId = eventNode.getAttribute("__vanilla_milk_temp_id__")
+                    if (!tempId) 
+                        return eventNode.removeAttribute("id")
+
+                    eventNode.setAttribute("id", tempId)
+                    eventNode.removeAttribute("__vanilla_milk_temp_id__")
+				})
+			}
+
+			parsedDomString(domString: string) {
+				let index = 0,
+					eventMap: any[] = []
+
+				let parsedDom = domString.replace(
+					/(?:\<)(?:[^\>]*)(?:\@)(?:[^\>]*)(?:\>)/gs,
+					(tag: string) => {
+                        let hasId = /id/.exec(tag)
+
+						if (hasId)
+							tag = tag.replace(
+								/id=("|')/gs,
+								(_, quote) =>
+									`id=${quote}__vanilla_milk_event_${index}__${quote} __vanilla_milk_temp_id__=${quote}`
+							)
+
+						tag = tag.replace(
+							/@([a-zA-Z]+)=("|')([a-zA-Z]+)("|')/gs,
+							(_, eventName, __, invoke) => {
+								eventMap.push({
+									event: eventName,
+									invoke: invoke
+								})
+
+								if (hasId) return ""
+								return `id="__vanilla_milk_event_${index}__"`
+							}
+						)
+
+						index++
+						return tag
+					}
+				)
+
+				parsedDom = parsedDom.replace(
+					/__hidden__/g,
+					`class="__vanilla_milk_hidden__"`
+				)
+
+				return [parsedDom, eventMap]
 			}
 
 			onPropsChange(attributeName: string): void {
@@ -333,30 +403,6 @@ export const create = <T, K extends keyof T>(
 				return [mappedState, this.setState]
 			}
 
-			mapEvent(template: HTMLTemplateElement): void {
-				properties.map(property => {
-					let { query, event, then } = property,
-						eachEvent = Array.isArray(event)
-							? event
-							: event.replace(/ /g, "").split(",")
-
-					eachEvent.forEach(eventName =>
-						template.content
-							.querySelector(query)
-							.addEventListener(eventName, () => {
-								let mappedState = this.mapState(),
-									prevState = this.mapState(Object.assign({}, this.state))[0]
-
-								then(mappedState)
-								let state = this.mapState(Object.assign({}, this.state))[0]
-
-								this.stateLifeCycle(prevState, state)
-								this.update()
-							})
-					)
-				})
-			}
-
 			parseAttribute(name: string): string | boolean | number {
 				let attrValue: string | boolean | number = this.getAttribute(name)
 
@@ -377,14 +423,6 @@ export const create = <T, K extends keyof T>(
 				}
 
 				return attrValue
-			}
-
-			onStylesheetLoaded() {
-				if (++this.stylesheet.totalLoaded !== this.stylesheet.source.length)
-					return
-
-				this.style.display = null
-				this.stylesheet.isLoaded = true
 			}
 		},
 	define = (tagName: string, className: ReturnType<typeof create>) =>

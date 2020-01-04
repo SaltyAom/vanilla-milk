@@ -167,7 +167,7 @@ export const create = <T, K extends keyof T>(
 
 				execution(
 					(domString: string) => {
-						template.innerHTML = domString
+						template.innerHTML = domString.replace(/__hidden__/g, `class="__vanilla_milk_hidden__"`)
 						template.content.insertBefore(
 							stylesheet,
 							template.content.childNodes[0]
@@ -176,6 +176,10 @@ export const create = <T, K extends keyof T>(
 						this.mapEvent(template)
 
 						this.milkDom(this.element, template.content)
+
+						this.element.querySelectorAll(".__vanilla_milk_hidden__").forEach((node) => {
+							node.parentNode.removeChild(node)
+						})
 					},
 					mappedState,
 					Object.assign(this.props, {
@@ -259,7 +263,7 @@ export const create = <T, K extends keyof T>(
 
 				// Diff
 				hardDiff.forEach((newNode: HTMLElement, index) => {
-					if (newNode.getAttribute("@hidden") === "")
+					if (newNode.getAttribute("class") === "__vanilla_milk_hidden__")
 						return displayed.removeChild(displayedChild[index])
 
 					displayed.replaceChild(newNode, displayedChild[index])

@@ -318,7 +318,41 @@ Now we hello is changed, first callback will run. Like view callback, useEffect 
   
 ## Milk DOM In depth
 Milk DOM cover a lot of thing under the cover but the main concept is to compare and diff DOM Node aimming for lesser iteration as possible (Same idea with VDOM). Instead of constructing an object node representation of DOM for comparing between two. Vanilla Milk heavily use Native Browser API comparing between each node instead of DOM and update it directly instead.
-But the DOM is hard to be maintained and manipulated, Vanilla Milk is good at comparing between each DOM Node but not where textNode are contained in.
+
+Since Milk DOM is written in template string, it's very hard for Vanilla Milk to identify which textNode should replace Node or vice-versa. In this case, you shouldn't replace existed dom with blank text ("") like how React, Vue, other library does (which will sometime, occured an unexpected error). Instead Vanilla Milk offter a way to replace Node with blank Node by putting any element with attribute of `__hidden__`
+```javascript
+const MilkCard = create(
+	(display, { isOpen }, { title, cover, children }) => {
+		return display(`
+		<main id="card" tabIndex=0>
+			<img id="cover" src="${cover}" alt="${title}" />
+			<section id="body">
+				<header id="header">
+					<h1 id="title">${title}</h1>
+					<button id="toggle">+</button>
+				</header>
+				${
+					isOpen
+						? `<section id="detail">${children}</section>`
+						: `<input __hidden__ />`
+				}
+			</section>
+		</main>
+	`)
+	},
+	{
+		title: useProps(),
+		cover: useProps(),
+		isOpen: useState(false),
+		css: useStyleSheet("/card.2f3a3ab9.css", "/card.2f3a3ab9.css")
+	},
+	{
+		query: "#toggle",
+		event: "click",
+		then: ([{ isOpen }, set]) => set.isOpen(!isOpen)
+	}
+)
+```
 
 Milk DOM's diffing algorithm are seperated into 3 parts.
 * Diff - Diffing for the different attribute, child node, etc.

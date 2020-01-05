@@ -176,35 +176,50 @@ const MilkComponent = create((display, state) => {
 
 define("milk-component", MilkComponent)
 ```
-Like in Vanilla JavaScript, we `query` an element, add `event` in to it `then` create a callback to do what we want! That's also how it work in Vanilla Milk but it's shorten!
+Vanilla Milk is declarative, this is where the last parameter come in!  
+You define any `events` you want here! It's take callback function so you're free to define everything like normal JavaScript here. Vanilla Milk called this parameters as `useEvents`.
 ```javascript
 import { create, define, useState } from "vanilla-milk"
 
-const MilkComponent = create((display, state) => {
+const MilkComponent = create((display, state, _, events) => {
+	console.log(events) // { increaseCount: "increaseCount" }
+
 	return display(`
 		<h1>Count ${state.count}</h1>
-    	<button id="increase-count">Increase count</button>
+    	<button id="increase-count" @click="${events.increaseCount}">Increase count</button>
 	`)
 },
 {
 	count: useState(0)
 },
-{
-	query: "#increase-count",
-	event: "click",
-	then: ([state, set]) => {
-		set.count(state.count + 1)
-    }
+([state, set], _) => {
+	let increaseCount = () => set.count(state.count + 1)
+    
+    return { increaseCount }
 })
 
 define("milk-component", MilkComponent)
 ```
-We have just said something like `when ID 'increase-count' is clicked then do something`.
-Notice that we have `[state, set]` in callback of `then`, this is where you can `access and set value of state`.
+`useEvents` take an callback which pass `[state, set]` which are used to access state and set the state. Receive `props` and second parameter. 
+###### *props will be explained in next section.
 ```javascript
-then: ([state, set]) => {
-	set.count(state.count + 1)
-}
+([state, set], props) => {
+	let increaseCount = () => set.count(state.count + 1)
+    
+    return { increaseCount }
+})
+```
+You might notice something there's `@click` in `button`, Vanilla Milk use pseudo attribute and match event to the node. This pseudo attribute take an export events name in `useEvents`.
+```javascript
+<button id="increase-count" @click="${events.increaseCount}">
+    Increase count
+</button>
+```
+Now everytime the button that as `@click` will run the function match to exports in `useEvents`, in this case it's `increaseCount`
+```javascript
+let increaseCount = () => set.count(state.count + 1)
+
+return { increaseCount }
 ```
 At here we get value of `count` from `state.count` and set it with `set.count` which came out with something like this:
 ```javascript
@@ -322,43 +337,43 @@ Milk DOM cover a lot of thing under the cover but the main concept is to compare
 Since Milk DOM is written in template string, it's very hard for Vanilla Milk to identify which textNode should replace Node or vice-versa. In this case, you shouldn't replace existed dom with blank text ("") like how React, Vue, other library does (which will sometime, occured an unexpected error). Instead Vanilla Milk offter a way to replace Node with blank Node by putting any element with attribute of `__hidden__`
 ```javascript
 const MilkCard = create(
-	(display, { isOpen }, { title, cover, children }) => {
+	(display, { isOpen }, { title, cover, children }, events) => {
 		return display(`
-		<main id="card" tabIndex=0>
-			<img id="cover" src="${cover}" alt="${title}" />
-			<section id="body">
-				<header id="header">
-					<h1 id="title">${title}</h1>
-					<button id="toggle">+</button>
-				</header>
-				${
-					isOpen
-						? `<section id="detail">${children}</section>`
-						: `<input __hidden__ />`
-				}
-			</section>
-		</main>
-	`)
+			<main id="card" tabIndex=0>
+				<img id="cover" src="${cover}" alt="${title}" />
+				<section id="body">
+					<header id="header">
+						<h1 id="title">${title}</h1>
+						<button id="toggle" @click="${events.toggleCard}">+</button>
+					</header>
+					${
+						isOpen
+							? `<section id="detail">${children}</section>`
+							: `<input @hidden />`
+					}
+				</section>
+			</main>
+		`)
 	},
 	{
 		title: useProps(),
 		cover: useProps(),
 		isOpen: useState(false),
-		css: useStyleSheet("/card.2f3a3ab9.css", "/card.2f3a3ab9.css")
+		cardStyle: useStyleSheet("/card.css")
 	},
-	{
-		query: "#toggle",
-		event: "click",
-		then: ([{ isOpen }, set]) => set.isOpen(!isOpen)
+	([state, set], props) => {
+		let toggleCard = () => set.isOpen(!state.isOpen)
+
+		return { toggleCard }
 	}
 )
+
 ```
 
 Milk DOM's diffing algorithm are seperated into 3 parts.
 * Diff - Diffing for the different attribute, child node, etc.
 * Hard Diff - When tagName are different, whole element node have to be replaced. Hard Diff take care of that preventing child node for being recursion.
 * Text Diff - Diffing for text different.
-#### Since Milk DOM is new concept for Vanilla Milk, some guideline might change in the future.
   
 ### Best practice
 To prevent an unexpected update, it's recommend to contained textNode in an element where textNode is state.
@@ -409,15 +424,16 @@ Vanilla Milk use Shadow DOM to encapsulate logic and style. Preventing an unexpe
   
 To use external stylesheet in Milk Component, you can assign stylesheet in the component instead
 ```javascript
-import { create } from "vanilla-milk"
+import { create, useStyleSheet } from "vanilla-milk"
 
 // Link stylesheet in component.
 let coolCard = create((display, { counter }) => {
 	return display(`
-		<link rel="stylesheet" href="/css/card.css">
-		<div class="card">
-		</div>
+		<div class="card"></div>
 	`)
+},
+{
+	cardStyle: useStyleSheet("/card.css")
 })
 
 // Or even define style tag inside
@@ -439,5 +455,4 @@ let coolCard = create(
 )
 ```
   
-That's pretty much it of Vanilla Milk 0.1.2. :tada::tada:
-I'm looking for implement more functionality to this project soon! ps. vdom are also planned to be added in the future~ Stay tuned!
+That's pretty much it of Vanilla Milk. :tada::tada:

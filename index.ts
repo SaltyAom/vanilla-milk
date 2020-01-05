@@ -15,7 +15,7 @@ export const create = <T, K extends keyof T>(
 			display: Function,
 			state: any,
 			props: any,
-			events: { [key: string]: string }
+			events: { [key: string]: ReturnType<keyof typeof useEvents> }
 		) => string | void,
 		hooks: Hooks<T, K> = {},
 		useEvents?: ([set, state]: any, props: any) => any
@@ -62,11 +62,7 @@ export const create = <T, K extends keyof T>(
 
 				this.element = this.attachShadow({ mode: "closed" })
 
-				if (
-					document.readyState === "interactive" ||
-					document.readyState === "complete"
-				)
-					this.initialize()
+				if (this.isReady()) this.initialize()
 				else
 					document.addEventListener("DOMContentLoaded", () => this.initialize())
 			}
@@ -86,11 +82,7 @@ export const create = <T, K extends keyof T>(
 
 				this.props[name] = attrValue
 
-				if (
-					document.readyState === "interactive" ||
-					document.readyState === "complete"
-				)
-					this.update()
+				if (this.isReady()) this.update()
 
 				this.onPropsChange(name)
 			}
@@ -127,6 +119,8 @@ export const create = <T, K extends keyof T>(
 					}
 				})
 
+				if (this.stylesheet.source.length) this.style.display = "none"
+
 				this.observer = new MutationObserver(mutationsList =>
 					mutationsList.forEach(() => this.update())
 				)
@@ -153,8 +147,13 @@ export const create = <T, K extends keyof T>(
 
 				let stylesheet = this.stylesheet.element.cloneNode(true)
 
-				let eventEntries: any = {}
+				/* Skip event listener if all stylesheet is loaded */
+				if (!this.stylesheet.isLoaded)
+					stylesheet.childNodes.forEach(
+						(doc: HTMLElement) => (doc.onload = () => this.onStylesheetLoaded())
+					)
 
+				let eventEntries: any = {}
 				Object.keys(this.events).forEach(eventName => {
 					eventEntries[eventName] = eventName
 				})
@@ -163,25 +162,25 @@ export const create = <T, K extends keyof T>(
 					(domString: string) => {
 						let [parsedDomString, eventMap]: any = this.parsedDomString(
 							domString
-                        )
+						)
 
-                        template.innerHTML = parsedDomString
-                        
+						template.innerHTML = parsedDomString
+
 						template.content.insertBefore(
 							stylesheet,
 							template.content.childNodes[0]
 						)
 
-                        this.mapEvent(template, eventMap)
-                        
+						this.mapEvent(template, eventMap)
+
 						this.milkDom(this.element, template.content)
 
-                        /* Clean up */
+						/* Clean up */
 						this.element
 							.querySelectorAll(".__vanilla_milk_hidden__")
 							.forEach(node => {
 								node.parentNode.removeChild(node)
-                            })
+							})
 					},
 					mappedState,
 					Object.assign(this.props, {
@@ -292,33 +291,37 @@ export const create = <T, K extends keyof T>(
 				})
 			}
 
+			onStylesheetLoaded() {
+				if (++this.stylesheet.totalLoaded !== this.stylesheet.source.length)
+					return
+
+				this.style.display = null
+				this.stylesheet.isLoaded = true
+			}
+
 			mapEvent(template: HTMLTemplateElement, eventMap: []) {
 				eventMap.forEach(({ event, invoke }, index) => {
 					let eventNode = template.content.getElementById(
 						`__vanilla_milk_event_${index}__`
 					)
 
-					eventNode.addEventListener(event, () => {
-						let mappedEvent = useEvents(
-								this.mapState(),
-								this.props
-							),
+					eventNode.addEventListener(event, (e) => {
+						let mappedEvent = useEvents(this.mapState(), this.props),
 							prevState = this.mapState(Object.assign({}, this.state))[0]
 
-						mappedEvent[invoke]()
+						mappedEvent[invoke](e)
 
 						let state = this.mapState(Object.assign({}, this.state))[0]
 
-						this.stateLifeCycle(prevState, state)
+						this.onStateChange(prevState, state)
 						this.update()
 					})
 
 					let tempId = eventNode.getAttribute("__vanilla_milk_temp_id__")
-                    if (!tempId) 
-                        return eventNode.removeAttribute("id")
+					if (!tempId) return eventNode.removeAttribute("id")
 
-                    eventNode.setAttribute("id", tempId)
-                    eventNode.removeAttribute("__vanilla_milk_temp_id__")
+					eventNode.setAttribute("id", tempId)
+					eventNode.removeAttribute("__vanilla_milk_temp_id__")
 				})
 			}
 
@@ -329,7 +332,7 @@ export const create = <T, K extends keyof T>(
 				let parsedDom = domString.replace(
 					/(?:\<)(?:[^\>]*)(?:\@)(?:[^\>]*)(?:\>)/gs,
 					(tag: string) => {
-                        let hasId = /id/.exec(tag)
+						let hasId = /id/.exec(tag)
 
 						if (hasId)
 							tag = tag.replace(
@@ -357,7 +360,7 @@ export const create = <T, K extends keyof T>(
 				)
 
 				parsedDom = parsedDom.replace(
-					/__hidden__/g,
+					/@hidden/g,
 					`class="__vanilla_milk_hidden__"`
 				)
 
@@ -365,7 +368,7 @@ export const create = <T, K extends keyof T>(
 			}
 
 			onPropsChange(attributeName: string): void {
-				let mappedState = this.mapState()[0]
+				let mappedState = this.mapState()
 
 				Object.entries(this.lifecycle).forEach(
 					([lifeCycleName, { listener, callback }]: any) => {
@@ -375,16 +378,20 @@ export const create = <T, K extends keyof T>(
 				)
 			}
 
-			stateLifeCycle(prevState: any, state: any): void {
+			onStateChange(prevState: any, state: any): void {
 				let diffState = Object.entries(state).filter(
 						([name, value]) => prevState[name] !== value
 					),
-					mappedDiff = diffState.map(([name, value]) => name)
+					mappedDiff = diffState.map(([name, value]) => name),
+					mappedState = this.mapState()
 
 				Object.entries(this.lifecycle).forEach(
 					([lifeCycleName, { listener, callback }]: any) => {
 						mappedDiff.forEach(diffState => {
-							if (listener.includes(diffState)) callback(state, this.props)
+							if (!listener.includes(diffState)) return
+
+							callback(mappedState, this.props)
+							this.update()
 						})
 					}
 				)
@@ -424,6 +431,13 @@ export const create = <T, K extends keyof T>(
 
 				return attrValue
 			}
+
+			isReady() {
+				return (
+					document.readyState === "interactive" ||
+					document.readyState === "complete"
+				)
+			}
 		},
 	define = (tagName: string, className: ReturnType<typeof create>) =>
 		customElements.define(tagName, className),
@@ -438,7 +452,7 @@ export const create = <T, K extends keyof T>(
 		type: "hookProp"
 	}),
 	useEffect = (
-		callback: (state: any, props: any) => void,
+		callback: ([state, set]: any, props: any) => void,
 		listener: string[]
 	): UseEffect => ({
 		type: "hookLifecycle",

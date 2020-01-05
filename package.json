@@ -1,12 +1,13 @@
 {
     "name": "vanilla-milk",
-    "version": "0.2.0",
+    "version": "0.3.0-beta.1",
     "description": "Simple library for building simple reactive web components.",
     "main": "index.js",
     "license": "MIT",
     "dependencies": {},
     "scripts": {
-        "build": "rm -rf dist && tsc --build && terser dist/index.js -o dist/index.js --compress --mangle && cp project/package.json dist/package.json && cp README.md dist/README.md"
+        "build": "rm -rf dist && tsc --build && terser dist/index.js -o dist/index.js --compress --mangle && cp project/package.json dist/package.json && cp README.md dist/README.md && cd dist && ls -lh",
+        "publish": "cd dist && yarn publish"
     },
     "devDependencies": {
         "terser": "^4.4.3",

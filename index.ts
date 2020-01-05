@@ -1,364 +1,534 @@
-interface MilkProperty {
-	query: string
-	event: string | string[]
-	then([state, set]: [
-		{ [key: string]: any },
-		{ [stateName: string]: Function }
-	]): void
-}
-
-type MilkEvent = MilkProperty[]
 type Hooks<T, K> = { type: K } | [K, Function] | { type: string } | {}
 
 interface UseProps {
-	type: "hookProp"
+    type: "hookProp"
 }
 
 interface UseEffect {
-	type: "hookLifecycle"
-	callback(state: any, props: any): void
-	listener: string[]
+    type: "hookLifecycle"
+    callback(state: any, props: any): void
+    listener: string[]
 }
 
 export const create = <T, K extends keyof T>(
-		execution: (display: Function, state: any, props: any) => string | void,
-		hooks: Hooks<T, K> = {},
-		...properties: MilkEvent
-	) =>
-		class VanillaMilk extends HTMLElement {
-			props: { [key: string]: any }
-			state: { [stateName: string]: Function }
-			setState: { [stateName: string]: Function }
-			lifecycle: {
-				[lifeCycleName: string]:
-					| {
-							callback(state: any, props: string | boolean | number): void
-							listener: { [key: string]: any }
-					  }
-					| {}
-			}
-			prevState: { [stateName: string]: Function }
-			observer: MutationObserver
-			children: HTMLCollection
+        execution: (
+            display: Function,
+            state: any,
+            props: any,
+            events: { [key: string]: ReturnType<keyof typeof useEvents> }
+        ) => string | void,
+        hooks: Hooks<T, K> = {},
+        useEvents?: ([set, state]: any, props: any) => any
+    ) =>
+        class VanillaMilk extends HTMLElement {
+            props: { [key: string]: any }
+            state: { [stateName: string]: Function }
+            setState: { [stateName: string]: Function }
+            lifecycle: {
+                [lifeCycleName: string]:
+                    | {
+                          callback(
+                              state: any,
+                              props: string | boolean | number
+                          ): void
+                          listener: { [key: string]: any }
+                      }
+                    | {}
+            }
+            prevState: { [stateName: string]: Function }
+            events: { [key: string]: string }
+            observer: MutationObserver
+            children: HTMLCollection
+            stylesheet: {
+                isLoaded: boolean
+                totalLoaded: number
+                source: string[]
+                element: HTMLHeadElement
+            }
 
-			element: ShadowRoot
+            element: ShadowRoot
 
-			constructor() {
-				super()
+            constructor() {
+                super()
 
-				this.props = []
-				this.state = {}
-				this.setState = {}
-				this.prevState = {}
-				this.lifecycle = {}
+                this.props = []
+                this.state = {}
+                this.setState = {}
+                this.prevState = {}
+                this.lifecycle = {}
+                this.stylesheet = {
+                    isLoaded: false,
+                    totalLoaded: 0,
+                    source: [],
+                    element: null
+                }
 
-				this.element = this.attachShadow({ mode: "closed" })
+                this.element = this.attachShadow({ mode: "closed" })
 
-				if (
-					document.readyState === "interactive" ||
-					document.readyState === "complete"
-				)
-					this.initialize()
-				else
-					document.addEventListener("DOMContentLoaded", () => this.initialize())
-			}
+                if (this.isReady()) this.initialize()
+                else
+                    document.addEventListener("DOMContentLoaded", () =>
+                        this.initialize()
+                    )
+            }
 
-			static get observedAttributes() {
-				let observedProps: string[] = []
+            static get observedAttributes() {
+                let observedProps: string[] = []
 
-				Object.entries(hooks).forEach(([name, hook]) => {
-					if (hook.type === "hookProp") return observedProps.push(name)
-				})
+                Object.entries(hooks).forEach(([name, hook]) => {
+                    if (hook.type === "hookProp")
+                        return observedProps.push(name)
+                })
 
-				return observedProps
-			}
+                return observedProps
+            }
 
-			attributeChangedCallback(name: string, oldValue: any, newValue: any) {
-				let attrValue = this.parseAttribute(name)
+            attributeChangedCallback(
+                name: string,
+                oldValue: any,
+                newValue: any
+            ) {
+                let attrValue = this.parseAttribute(name)
 
-				this.props[name] = attrValue
+                this.props[name] = attrValue
 
-				if (
-					document.readyState === "interactive" ||
-					document.readyState === "complete"
-				)
-					this.update()
+                if (this.isReady()) this.update()
 
-				this.onPropsChange(name)
-			}
+                this.onPropsChange(name)
+            }
 
-			initialize(): void {
-				Object.entries(hooks).forEach(([name, hook]: any) => {
-					switch (hook.type) {
-						case "hookProp":
-							let attrValue = this.parseAttribute(name)
+            initialize(): void {
+                Object.entries(hooks).forEach(([name, hook]: any) => {
+                    switch (hook.type) {
+                        case "hookProp":
+                            let attrValue = this.parseAttribute(name)
 
-							return (this.props[name] = attrValue)
+                            return (this.props[name] = attrValue)
 
-						case "hookLifecycle":
-							return (this.lifecycle[name] = {
-								callback: hook.callback,
-								listener: hook.listener
-							})
+                        case "hookLifecycle":
+                            return (this.lifecycle[name] = {
+                                callback: hook.callback,
+                                listener: hook.listener
+                            })
 
-						default:
-							return ([this.state[name], this.setState[name]] = hook)
-					}
-				})
+                        case "hookStyleSheet":
+                            let styleSheetNode = document.createElement("head")
+                            styleSheetNode.setAttribute(
+                                "id",
+                                "__vanilla_milk_stylesheet__"
+                            )
+                            hook.stylesheets.forEach((source: string) => {
+                                let link = document.createElement("link")
+                                link.setAttribute("rel", "stylesheet")
+                                link.setAttribute("href", source)
 
-				this.observer = new MutationObserver((mutationsList, observer) =>
-					mutationsList.forEach(() => this.update())
-				)
+                                this.stylesheet.source.push(source)
+                                styleSheetNode.appendChild(link)
+                            })
+                            return (this.stylesheet.element = styleSheetNode)
 
-				this.observer.observe(this, {
-					childList: true,
-					characterData: true,
-					subtree: true
-				})
+                        default:
+                            return ([
+                                this.state[name],
+                                this.setState[name]
+                            ] = hook)
+                    }
+                })
 
-				this.update()
-			}
+                if (this.stylesheet.source.length) this.style.display = "none"
 
-			update(): void {
-				let mappedState = this.mapState()[0],
-					template = document.createElement("template"),
-					children = new String()
+                this.observer = new MutationObserver(mutationsList =>
+                    mutationsList.forEach(() => this.update())
+                )
 
-				Array.from(this.children).forEach(
-					(node: any) => (children += node.outerHTML)
-				)
+                this.events = useEvents(this.mapState(), this.props)
 
-				execution(
-					(domString: string) => {
-						template.innerHTML = domString
-						this.mapEvent(template)
+                this.observer.observe(this, {
+                    childList: true,
+                    characterData: true,
+                    subtree: true
+                })
 
-						this.milkDom(this.element, template.content)
-					},
-					mappedState,
-					Object.assign(this.props, {
-						children: this.children.length
-							? children
-							: this.textContent.replace(/\n|\t|\ \ /g, "")
-					})
-				)
-			}
+                this.update()
+            }
 
-			milkDom(
-				displayed: ShadowRoot | Node,
-				template: HTMLTemplateElement | DocumentFragment
-			) {
-				template.childNodes.forEach(templateChild => {
-					if (
-						templateChild.nodeName === "#text" &&
-						templateChild.textContent.replace(/\t|\n|\ /g, "") === ""
-					)
-						template.removeChild(templateChild)
-				})
+            update(): void {
+                let mappedState = this.mapState()[0],
+                    template = document.createElement("template"),
+                    children = new String()
 
-				displayed.childNodes.forEach(displayedChild => {
-					if (
-						displayedChild.nodeName === "#text" &&
-						displayedChild.textContent.replace(/\t|\n|\ /g, "") === ""
-					)
-						displayed.removeChild(displayedChild)
-				})
+                Array.from(this.children).forEach(
+                    (node: any) => (children += node.outerHTML)
+                )
 
-				let templateChild = template.childNodes,
-					displayedChild = displayed.childNodes
+                let stylesheet = this.stylesheet.source.length
+                    ? this.stylesheet.element.cloneNode(true)
+                    : null
 
-				let diff: ChildNode[] = [],
-					textDiff: string[] = [],
-					hardDiff: ChildNode[] = []
+                /* Skip event listener if all stylesheet is loaded */
+                if (this.stylesheet.source.length && !this.stylesheet.isLoaded)
+                    stylesheet.childNodes.forEach(
+                        (doc: HTMLElement) =>
+                            (doc.onload = () => this.onStylesheetLoaded())
+                    )
 
-				templateChild.forEach((templateChildNode, index) => {
-					if (templateChildNode.isEqualNode(displayedChild[index])) return
+                let eventEntries: any = {}
+                Object.keys(this.events).forEach(eventName => {
+                    eventEntries[eventName] = eventName
+                })
 
-					// Check if node is the same but text is different
-					if (typeof displayedChild[index] !== "undefined") {
-						let tempNode: any = displayedChild[index].cloneNode(true)
-						tempNode.textContent = templateChildNode.textContent
+                execution(
+                    (domString: string) => {
+                        let [
+                            parsedDomString,
+                            eventMap
+                        ]: any = this.parsedDomString(domString)
 
-						if (tempNode.isEqualNode(templateChildNode))
-							return (textDiff[index] = tempNode.textContent)
-					}
+                        template.innerHTML = parsedDomString
 
-					// Hard diff
-					if (
-						typeof displayedChild[index] !== "undefined" &&
-						templateChildNode.nodeName !== displayedChild[index].nodeName
-					)
-						return (hardDiff[index] = templateChildNode)
+                        if (stylesheet !== null)
+                            template.content.insertBefore(
+                                stylesheet,
+                                template.content.childNodes[0]
+                            )
 
-					// Compare child
-					let templateTemplate = new DocumentFragment()
+                        this.mapEvent(template, eventMap)
 
-					templateChildNode
-						.cloneNode(true)
-						.childNodes.forEach((deepChild, index) => {
-							if (
-								deepChild.nodeName === "#text" &&
-								deepChild.textContent.replace(/\t|\n|\ /g, "") === ""
-							)
-								return
+                        this.milkDom(this.element, template.content)
 
-							templateTemplate.appendChild(deepChild)
-						})
+                        /* Clean up */
+                        this.element
+                            .querySelectorAll(".__vanilla_milk_hidden__")
+                            .forEach(node => {
+                                node.parentNode.removeChild(node)
+                            })
+                    },
+                    mappedState,
+                    Object.assign(this.props, {
+                        children: this.children.length
+                            ? children
+                            : this.textContent.replace(/\n|\t|\ \ /g, "")
+                    }),
+                    eventEntries
+                )
+            }
 
-					// If there's different node and displayed isn't blank
-					if (
-						templateTemplate.childNodes.length &&
-						typeof displayed.childNodes[index] !== "undefined"
-					)
-						return this.milkDom(displayed.childNodes[index], templateTemplate)
+            milkDom(
+                displayed: ShadowRoot | Node,
+                template: HTMLTemplateElement | DocumentFragment
+            ) {
+                /* Remove blank tab and space from template string */
+                template.childNodes.forEach(templateChild => {
+                    if (
+                        templateChild.nodeName === "#text" &&
+                        templateChild.textContent.replace(/\t|\n|\ /g, "") ===
+                            ""
+                    )
+                        template.removeChild(templateChild)
+                })
 
-					diff[index] = templateChildNode
-				})
+                displayed.childNodes.forEach(displayedChild => {
+                    if (
+                        displayedChild.nodeName === "#text" &&
+                        displayedChild.textContent.replace(/\t|\n|\ /g, "") ===
+                            ""
+                    )
+                        displayed.removeChild(displayedChild)
+                })
 
-				// Diff
-				hardDiff.forEach((newNode, index) => {
-					displayed.replaceChild(newNode, displayedChild[index])
-				})
+                let templateChild = template.childNodes,
+                    displayedChild = displayed.childNodes
 
-				diff.forEach((newNode, index) => {
-					if (typeof displayedChild[index] === "undefined")
-						return displayed.insertBefore(newNode, displayedChild[index])
+                let diff: ChildNode[] = [],
+                    textDiff: string[] = [],
+                    hardDiff: ChildNode[] = []
 
-					if (displayed.childNodes[index].nodeName === "#text")
-						return displayed.parentNode.replaceChild(
-							newNode,
-							displayed.parentNode.childNodes[index]
-						)
+                templateChild.forEach(
+                    (templateChildNode: HTMLElement, index) => {
+                        if (
+                            templateChildNode.isEqualNode(displayedChild[index])
+                        )
+                            return
 
-					displayed.replaceChild(newNode, displayed.childNodes[index])
-				})
+                        // Check if node is the same but text is different
+                        if (typeof displayedChild[index] !== "undefined") {
+                            let tempNode: Node = displayedChild[
+                                index
+                            ].cloneNode(true)
+                            tempNode.textContent = templateChildNode.textContent
 
-				if (diff.length > displayedChild.length)
-					displayedChild.forEach((displayedNode, index) => {
-						if (index >= diff.length) return
+                            if (tempNode.isEqualNode(templateChildNode))
+                                return (textDiff[index] = tempNode.textContent)
+                        }
 
-						displayed.removeChild(displayedChild[index + 1])
-					})
+                        // Hard diff
+                        if (
+                            typeof displayedChild[index] !== "undefined" &&
+                            templateChildNode.nodeName !==
+                                displayedChild[index].nodeName
+                        )
+                            return (hardDiff[index] = templateChildNode)
 
-				textDiff.forEach((text, index) => {
-					displayed.childNodes[index].textContent = textDiff[index]
-				})
-			}
+                        // Compare child
+                        let templateTemplate = new DocumentFragment()
 
-			onPropsChange(attributeName: string): void {
-				let mappedState = this.mapState()[0]
+                        templateChildNode
+                            .cloneNode(true)
+                            .childNodes.forEach(deepChild => {
+                                if (deepChild.nodeName === "#text") return
 
-				Object.entries(this.lifecycle).forEach(
-					([lifeCycleName, { listener, callback }]: any) => {
-						if (listener.includes(attributeName))
-							callback(mappedState, this.props)
-					}
-				)
-			}
+                                templateTemplate.appendChild(deepChild)
+                            })
 
-			stateLifeCycle(prevState: any, state: any): void {
-				let diffState = Object.entries(state).filter(
-						([name, value]) => prevState[name] !== value
-					),
-					mappedDiff = diffState.map(([name, value]) => name)
+                        // If there's different node and displayed isn't blank
+                        if (
+                            templateTemplate.childNodes.length &&
+                            typeof displayed.childNodes[index] !== "undefined"
+                        )
+                            return this.milkDom(
+                                displayed.childNodes[index],
+                                templateTemplate
+                            )
 
-				Object.entries(this.lifecycle).forEach(
-					([lifeCycleName, { listener, callback }]: any) => {
-						mappedDiff.forEach(diffState => {
-							if (listener.includes(diffState)) callback(state, this.props)
-						})
-					}
-				)
-			}
+                        diff[index] = templateChildNode
+                    }
+                )
 
-			mapState(
-				state = this.state
-			): [{ [key: string]: any }, { [stateName: string]: Function }] {
-				let mappedState = Object.assign({}, state)
+                // Diff
+                hardDiff.forEach((newNode: HTMLElement, index) => {
+                    if (
+                        newNode.getAttribute("class") ===
+                        "__vanilla_milk_hidden__"
+                    )
+                        return displayed.removeChild(displayedChild[index])
 
-				Object.entries(this.state).map(([name, hook]) => {
-					if (typeof state[name] === "function")
-						return (mappedState[name] = state[name]())
-				})
+                    displayed.replaceChild(newNode, displayedChild[index])
+                })
 
-				return [mappedState, this.setState]
-			}
+                diff.forEach((newNode, index) => {
+                    if (typeof displayedChild[index] === "undefined")
+                        return displayed.insertBefore(
+                            newNode,
+                            displayedChild[index]
+                        )
 
-			mapEvent(template: HTMLTemplateElement): void {
-				properties.map(property => {
-					let { query, event, then } = property,
-						eachEvent = Array.isArray(event)
-							? event
-							: event.replace(/ /g, "").split(",")
+                    if (displayed.childNodes[index].nodeName === "#text")
+                        return displayed.parentNode.replaceChild(
+                            newNode,
+                            displayed.parentNode.childNodes[index]
+                        )
 
-					eachEvent.forEach(eventName =>
-						template.content
-							.querySelector(query)
-							.addEventListener(eventName, () => {
-								let mappedState = this.mapState(),
-									prevState = this.mapState(Object.assign({}, this.state))[0]
+                    displayed.replaceChild(newNode, displayed.childNodes[index])
+                })
 
-								then(mappedState)
-								let state = this.mapState(Object.assign({}, this.state))[0]
+                if (diff.length > displayedChild.length)
+                    displayedChild.forEach((displayedNode, index) => {
+                        if (index >= diff.length) return
 
-								this.stateLifeCycle(prevState, state)
-								this.update()
-							})
-					)
-				})
-			}
+                        displayed.removeChild(displayedChild[index + 1])
+                    })
 
-			parseAttribute(name: string): string | boolean | number {
-				let attrValue: string | boolean | number = this.getAttribute(name)
+                textDiff.forEach((text, index) => {
+                    displayed.childNodes[index].textContent = textDiff[index]
+                })
+            }
 
-				switch (attrValue) {
-					case "true":
-						attrValue = true
-						break
+            onStylesheetLoaded() {
+                if (
+                    ++this.stylesheet.totalLoaded !==
+                    this.stylesheet.source.length
+                )
+                    return
 
-					case "false":
-						attrValue = false
-						break
+                this.style.display = null
+                this.stylesheet.isLoaded = true
+            }
 
-					default:
-						if (/^[-|+]?[0-9]*$/.test(attrValue)) {
-							let temporyValue = parseInt(attrValue, 10)
-							if (!isNaN(temporyValue)) attrValue = parseInt(attrValue, 10)
-						}
-				}
+            mapEvent(template: HTMLTemplateElement, eventMap: []) {
+                eventMap.forEach(({ event, invoke }, index) => {
+                    let eventNode = template.content.getElementById(
+                        `__vanilla_milk_event_${index}__`
+                    )
 
-				return attrValue
-			}
-		},
-	define = (tagName: string, className: ReturnType<typeof create>) =>
-		customElements.define(tagName, className),
-	useState = (initValue: any) => {
-		let _value = initValue,
-			getValue = () => _value,
-			setValue = (newValue: any) => (_value = newValue)
+                    eventNode.addEventListener(event, (e: Event) => {
+                        let mappedEvent = useEvents(
+                                this.mapState(),
+                                this.props
+                            ),
+                            prevState = this.mapState(
+                                Object.assign({}, this.state)
+                            )[0]
 
-		return [getValue, setValue]
-	},
-	useProps = (): UseProps => ({
-		type: "hookProp"
-	}),
-	useEffect = (
-		callback: (state: any, props: any) => void,
-		listener: string[]
-	): UseEffect => {
-		return {
-			type: "hookLifecycle",
-			callback: callback,
-			listener: listener
-		}
-	}
+                        mappedEvent[invoke](e)
+
+                        let state = this.mapState(
+                            Object.assign({}, this.state)
+                        )[0]
+
+                        this.onStateChange(prevState, state)
+                        this.update()
+                    })
+
+                    let tempId = eventNode.getAttribute(
+                        "__vanilla_milk_temp_id__"
+                    )
+                    if (!tempId) return eventNode.removeAttribute("id")
+
+                    eventNode.setAttribute("id", tempId)
+                    eventNode.removeAttribute("__vanilla_milk_temp_id__")
+                })
+            }
+
+            parsedDomString(domString: string) {
+                let index = 0,
+                    eventMap: any[] = []
+
+                let parsedDom = domString.replace(
+                    /(?:\<)(?:[^\>]*)(?:\@)(?:[^\>]*)(?:\>)/gs,
+                    (tag: string) => {
+                        let hasId = /id/.exec(tag)
+
+                        if (hasId)
+                            tag = tag.replace(
+                                /id=("|')/gs,
+                                (_, quote) =>
+                                    `id=${quote}__vanilla_milk_event_${index}__${quote} __vanilla_milk_temp_id__=${quote}`
+                            )
+
+                        tag = tag.replace(
+                            /@([a-zA-Z]+)=("|')([a-zA-Z]+)("|')/gs,
+                            (_, eventName, __, invoke) => {
+                                eventMap.push({
+                                    event: eventName,
+                                    invoke: invoke
+                                })
+
+                                if (hasId) return ""
+                                return `id="__vanilla_milk_event_${index}__"`
+                            }
+                        )
+
+                        index++
+                        return tag
+                    }
+                )
+
+                parsedDom = parsedDom.replace(
+                    /@hidden/g,
+                    `class="__vanilla_milk_hidden__"`
+                )
+
+                return [parsedDom, eventMap]
+            }
+
+            onPropsChange(attributeName: string): void {
+                let mappedState = this.mapState()
+
+                Object.entries(this.lifecycle).forEach(
+                    ([lifeCycleName, { listener, callback }]: any) => {
+                        if (listener.includes(attributeName))
+                            callback(mappedState, this.props)
+                    }
+                )
+            }
+
+            onStateChange(prevState: any, state: any): void {
+                let diffState = Object.entries(state).filter(
+                        ([name, value]) => prevState[name] !== value
+                    ),
+                    mappedDiff = diffState.map(([name, value]) => name),
+                    mappedState = this.mapState()
+
+                Object.entries(this.lifecycle).forEach(
+                    ([lifeCycleName, { listener, callback }]: any) => {
+                        mappedDiff.forEach(diffState => {
+                            if (!listener.includes(diffState)) return
+
+                            callback(mappedState, this.props)
+                            this.update()
+                        })
+                    }
+                )
+            }
+
+            mapState(
+                state = this.state
+            ): [{ [key: string]: any }, { [stateName: string]: Function }] {
+                let mappedState = Object.assign({}, state)
+
+                Object.entries(this.state).map(([name, hook]) => {
+                    if (typeof state[name] === "function")
+                        return (mappedState[name] = state[name]())
+                })
+
+                return [mappedState, this.setState]
+            }
+
+            parseAttribute(name: string): string | boolean | number {
+                let attrValue: string | boolean | number = this.getAttribute(
+                    name
+                )
+
+                switch (attrValue) {
+                    case "true":
+                        attrValue = true
+                        break
+
+                    case "false":
+                        attrValue = false
+                        break
+
+                    default:
+                        if (/^[-|+]?[0-9]*$/.test(attrValue)) {
+                            let temporyValue = parseInt(attrValue, 10)
+                            if (!isNaN(temporyValue))
+                                attrValue = parseInt(attrValue, 10)
+                        }
+                }
+
+                return attrValue
+            }
+
+            isReady() {
+                return (
+                    document.readyState === "interactive" ||
+                    document.readyState === "complete"
+                )
+            }
+        },
+    define = (tagName: string, className: ReturnType<typeof create>) =>
+        !customElements.get(tagName)
+            ? customElements.define(tagName, className)
+            : null,
+    useState = (initValue: any) => {
+        let _value = initValue,
+            getValue = () => _value,
+            setValue = (newValue: any) => (_value = newValue)
+
+        return [getValue, setValue]
+    },
+    useProps = (): UseProps => ({
+        type: "hookProp"
+    }),
+    useEffect = (
+        callback: ([state, set]: any, props: any) => void,
+        listener: string[]
+    ): UseEffect => ({
+        type: "hookLifecycle",
+        callback: callback,
+        listener: listener
+    }),
+    useStyleSheet = (...stylesheets: string[]) => ({
+        type: "hookStyleSheet",
+        stylesheets: stylesheets
+    })
 
 const vanillaMilk = {
-	create: create,
-	define: define,
-	useState,
-	useProps,
-	useEffect
+    create: create,
+    define: define,
+    useState,
+    useProps,
+    useEffect
 }
 
 export default vanillaMilk

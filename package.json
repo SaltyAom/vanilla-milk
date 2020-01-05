@@ -1,15 +1,18 @@
 {
     "name": "vanilla-milk",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "Simple library for building simple reactive web components.",
     "main": "index.js",
     "license": "MIT",
     "dependencies": {},
     "scripts": {
-        "build": "rm -rf dist && tsc --build && terser dist/index.js -o dist/index.js --compress --mangle && cp project/package.json dist/package.json && cp README.md dist/README.md"
+        "build": "rm -rf dist && tsc --build && terser dist/index.js -o dist/index.js --compress --mangle && cp project/package.json dist/package.json && cp README.md dist/README.md && cd dist && ls -lh"
     },
     "devDependencies": {
         "terser": "^4.4.3",
         "typescript": "^3.7.4"
+    },
+    "publishConfig": {
+        "registry": "https://www.npmjs.com/package/vanilla-milk"
     }
 }

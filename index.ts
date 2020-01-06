@@ -165,7 +165,7 @@ export const create = <T, K extends keyof T>(
 
 				execution(
 					(domString: string) => {
-						let [parsedDomString, eventMap]: any = this.parsedDomString(
+						let [parsedDomString, eventMap]: any = this.parseDomString(
 							domString
 						)
 
@@ -200,7 +200,8 @@ export const create = <T, K extends keyof T>(
 
 			milkDom(
 				displayed: ShadowRoot | Node,
-				template: HTMLTemplateElement | DocumentFragment
+				template: HTMLTemplateElement | DocumentFragment,
+				selfAdjust = true
 			) {
 				/* Remove blank tab and space from template string */
 				template.childNodes.forEach(templateChild => {
@@ -226,8 +227,16 @@ export const create = <T, K extends keyof T>(
 					textDiff: string[] = [],
 					hardDiff: ChildNode[] = []
 
-				let templateBeforeDiff = template.cloneNode(true),
-					templateLength = templateBeforeDiff.childNodes.length
+				let isInit = typeof displayed === "undefined",
+					templateBeforeDiff = template.cloneNode(true) as HTMLTemplateElement,
+					templateChildBeforeDiff = templateBeforeDiff.childNodes
+
+				/* Handle child overwritten */
+				while (templateChild.length < displayedChild.length) {
+					let hidden = document.createElement("div")
+					hidden.setAttribute("class", "__vanilla_milk_hidden__")
+					template.appendChild(hidden)
+				}
 
 				templateChild.forEach((templateChildNode: HTMLElement, index) => {
 					if (templateChildNode.isEqualNode(displayedChild[index])) return
@@ -267,10 +276,11 @@ export const create = <T, K extends keyof T>(
 					diff[index] = templateChildNode
 				})
 
-				let isDisplayNodeEmpty = !displayedChild.length
-
 				// Diff
 				hardDiff.forEach((newNode: HTMLElement, index) => {
+					if (typeof displayedChild[index] === "undefined")
+						return displayed.insertBefore(newNode, displayedChild[index])
+
 					if (newNode.getAttribute("class") === "__vanilla_milk_hidden__")
 						return displayed.removeChild(displayedChild[index])
 
@@ -290,36 +300,21 @@ export const create = <T, K extends keyof T>(
 					displayed.replaceChild(newNode, displayed.childNodes[index])
 				})
 
-				if (diff.length > displayedChild.length)
+				if (diff.length < displayedChild.length)
 					displayedChild.forEach((displayedNode, index) => {
 						if (index >= diff.length) return
 
 						displayed.removeChild(displayedChild[index + 1])
 					})
 
-				textDiff.forEach((text, index) => {
-					displayed.childNodes[index].textContent = textDiff[index]
-				})
+				textDiff.forEach(
+					(text, index) =>
+						(displayed.childNodes[index].textContent = textDiff[index])
+				)
 
-				/* Clean up in-case of if anythin went wrong */
-				if (!isDisplayNodeEmpty && displayedChild.length !== templateLength)
-					/* Recheck time based on leftover */
-					Array.apply(null, new Array(displayedChild.length - templateLength)).forEach(() => {
-						templateBeforeDiff.childNodes.forEach((node, index) => {
-							if (!node.isEqualNode(displayedChild[index]))
-								displayed.removeChild(displayedChild[index])
-						})
-
-						if (displayedChild.length === templateLength) return
-						
-						/* Has some left over */
-						for (
-							let leftOver = templateBeforeDiff.childNodes.length;
-							leftOver < displayedChild.length;
-							leftOver++
-						)
-							displayed.removeChild(displayedChild[leftOver])
-					})
+				/* Use self-adjust on node removal */
+				if(!isInit && selfAdjust && templateChildBeforeDiff.length < displayedChild.length)
+					this.milkDom(displayed, templateBeforeDiff, (displayedChild.length - templateChildBeforeDiff.length) > 1)
 			}
 
 			onStylesheetLoaded() {
@@ -358,7 +353,7 @@ export const create = <T, K extends keyof T>(
 				})
 			}
 
-			parsedDomString(domString: string) {
+			parseDomString(domString: string) {
 				let index = 0,
 					eventMap: any[] = []
 

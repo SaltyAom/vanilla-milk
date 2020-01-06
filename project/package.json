@@ -1,6 +1,6 @@
 {
   "name": "vanilla-milk",
-  "version": "0.3.0",
+  "version": "0.3.1-beta.0",
   "description": "Simple library for building simple reactive web components.",
   "main": "index.js",
   "repository": "https://github.com/SaltyAom/vanilla-milk",

@@ -1,5 +1,3 @@
-import "@webcomponents/webcomponentsjs/webcomponents-bundle.js"
-
 type Hooks<T, K> = { type: K } | [K, Function] | { type: string } | {}
 
 interface UseProps {

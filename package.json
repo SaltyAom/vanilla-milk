@@ -4,12 +4,10 @@
     "description": "Simple library for building simple reactive web components.",
     "main": "index.js",
     "license": "MIT",
-    "dependencies": {
-        "@webcomponents/webcomponentsjs": "^2.4.0"
-    },
+    "dependencies": {},
     "scripts": {
         "build": "rm -rf dist && tsc --build && terser dist/index.js -o dist/index.js --compress --mangle && cp project/package.json dist/package.json && cp README.md dist/README.md && cd dist && ls -lh",
-        "test": "jest --env=jest-environment-happy-dom"
+        "test": "jest"
     },
     "devDependencies": {
         "@babel/core": "^7.7.7",

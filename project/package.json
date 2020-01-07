@@ -5,6 +5,9 @@
   "main": "index.js",
   "repository": "https://github.com/SaltyAom/vanilla-milk",
   "author": "SaltyAom",
+  "dependencies": {
+      "@webcomponents/webcomponentsjs": "^2.4.0"
+  },
   "license": "MIT",
   "keywords": ["vanilla milk", "web component", "vanilla milk js"]
 }

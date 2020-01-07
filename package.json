@@ -1,15 +1,25 @@
 {
     "name": "vanilla-milk",
-    "version": "0.3.2-beta.1",
+    "version": "0.3.2-beta.5",
     "description": "Simple library for building simple reactive web components.",
     "main": "index.js",
     "license": "MIT",
-    "dependencies": {},
+    "dependencies": {
+        "@webcomponents/webcomponentsjs": "^2.4.0"
+    },
     "scripts": {
-        "build": "rm -rf dist && tsc --build && terser dist/index.js -o dist/index.js --compress --mangle && cp project/package.json dist/package.json && cp README.md dist/README.md && cd dist && ls -lh"
+        "build": "rm -rf dist && tsc --build && terser dist/index.js -o dist/index.js --compress --mangle && cp project/package.json dist/package.json && cp README.md dist/README.md && cd dist && ls -lh",
+        "test": "jest --env=jest-environment-happy-dom"
     },
     "devDependencies": {
+        "@babel/core": "^7.7.7",
+        "@babel/preset-env": "^7.7.7",
+        "@types/jest": "^24.0.25",
+        "@types/node": "^13.1.4",
+        "babel-jest": "^24.9.0",
+        "jest": "^24.9.0",
         "terser": "^4.6.0",
+        "ts-jest": "^24.3.0",
         "typescript": "^3.7.4"
     },
     "publishConfig": {

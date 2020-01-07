@@ -8,10 +8,7 @@
     "sourceMap": true,
     "declaration": true,
     "outDir": "dist",
-    "lib": ["es2017", "dom"],
-    "experimentalDecorators": true
+    "lib": ["es2017", "dom"]
   },
-  "parcel-plugin-typescript": {
-    "transpileOnly": true
-  }
+  "exclude": ["node_modules", "__tests__/*.test.ts"]
 }

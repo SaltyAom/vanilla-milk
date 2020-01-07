@@ -1,3 +1,5 @@
+import "@webcomponents/webcomponentsjs/webcomponents-bundle.js"
+
 type Hooks<T, K> = { type: K } | [K, Function] | { type: string } | {}
 
 interface UseProps {
@@ -136,12 +138,16 @@ export const create = <T, K extends keyof T>(
 					subtree: true
 				})
 
+				Object.entries(this.lifecycle).forEach(([name, hook]) => {
+					let { callback }: any = hook
+					callback(this.mapState(), this.props)
+				})
+
 				this.update()
 			}
 
 			update(): void {
-				let mappedState = this.mapState()[0],
-					template = document.createElement("template"),
+				let template = document.createElement("template"),
 					children = new String()
 
 				Array.from(this.children).forEach(
@@ -178,10 +184,10 @@ export const create = <T, K extends keyof T>(
 							)
 
 						this.mapEvent(template, eventMap)
-
+						
 						this.milkDom(this.element, template.content)
 					},
-					mappedState,
+					this.mapState()[0],
 					Object.assign(this.props, {
 						children: this.children.length
 							? children
@@ -225,10 +231,10 @@ export const create = <T, K extends keyof T>(
 					templateChildBeforeDiff = templateBeforeDiff.childNodes
 
 				/* Handle child overwritten */
+				let hidden = document.createElement("div")
+				hidden.setAttribute("class", "__vanilla_milk_hidden__")
 				while (templateChild.length < displayedChild.length) {
-					let hidden = document.createElement("div")
-					hidden.setAttribute("class", "__vanilla_milk_hidden__")
-					template.appendChild(hidden)
+					template.appendChild(hidden.cloneNode(true))
 				}
 
 				templateChild.forEach((templateChildNode: HTMLElement, index) => {
@@ -236,11 +242,20 @@ export const create = <T, K extends keyof T>(
 
 					// Check if node is the same but text is different
 					if (typeof displayedChild[index] !== "undefined") {
-						let tempNode: Node = displayedChild[index].cloneNode(true)
+						let tempNode: Node = displayedChild[index].cloneNode(true),
+							displayedContent = tempNode.textContent
 						tempNode.textContent = templateChildNode.textContent
 
 						if (tempNode.isEqualNode(templateChildNode))
-							return (textDiff[index] = tempNode.textContent)
+							/* Content of style doesn't matter by whitespace and breakline */
+							if(templateChildNode.nodeName === "STYLE"){
+								let styleContent = templateChildNode.textContent.replace(/\n|\t|\ /g, ""),
+									displayedStyle = displayedContent.replace(/\n|\t|\ /g, "")
+
+								if(styleContent === displayedStyle)
+									return
+							} else 
+								return (textDiff[index] = tempNode.textContent)
 					}
 
 					// Hard diff

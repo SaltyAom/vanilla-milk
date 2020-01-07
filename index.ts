@@ -180,13 +180,6 @@ export const create = <T, K extends keyof T>(
 						this.mapEvent(template, eventMap)
 
 						this.milkDom(this.element, template.content)
-
-						/* Clean up */
-						this.element
-							.querySelectorAll(".__vanilla_milk_hidden__")
-							.forEach(node => {
-								node.parentNode.removeChild(node)
-							})
 					},
 					mappedState,
 					Object.assign(this.props, {
@@ -312,9 +305,24 @@ export const create = <T, K extends keyof T>(
 						(displayed.childNodes[index].textContent = textDiff[index])
 				)
 
+				/* Clean up */
+				this.element
+					.querySelectorAll(".__vanilla_milk_hidden__")
+					.forEach(node => {
+						node.parentNode.removeChild(node)
+					})
+
 				/* Use self-adjust on node removal */
-				if(!isInit && selfAdjust && templateChildBeforeDiff.length < displayedChild.length)
-					this.milkDom(displayed, templateBeforeDiff, (displayedChild.length - templateChildBeforeDiff.length) > 1)
+				if (
+					!isInit &&
+					selfAdjust &&
+					templateChildBeforeDiff.length < displayedChild.length
+				)
+					this.milkDom(
+						displayed,
+						templateBeforeDiff,
+						displayedChild.length - templateChildBeforeDiff.length > 1
+					)
 			}
 
 			onStylesheetLoaded() {

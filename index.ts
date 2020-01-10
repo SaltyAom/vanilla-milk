@@ -12,6 +12,7 @@ interface UseEffect {
 
 interface StoreEvent extends Event {
 	detail: {
+		name: string
 		args: any
 	}
 }
@@ -124,9 +125,9 @@ export const create = <T, K extends keyof T>(
 							return Object.entries(hook.shared).forEach(
 								([name, hook]: any) => {
 									this.state[name] = hook[0]
-									this.setState[name] = (args: typeof hook[0]) => hook[1](args)
+									this.setState[name] = (args: typeof hook[0]) => hook[1](args, name)
 									hook[2].addEventListener("update", (event: StoreEvent) => {
-										hook[1](event.detail.args, false)
+										hook[1](event.detail.args, name, false)
 										this.update()
 									})
 								}
@@ -158,10 +159,9 @@ export const create = <T, K extends keyof T>(
 					subtree: true
 				})
 
-				Object.entries(this.lifecycle).forEach(([name, hook]) => {
-					let { callback }: any = hook
-					callback(this.mapState(), this.props)
-				})
+				Object.entries(this.lifecycle).forEach(([name, hook]: any) =>
+					hook.callback(this.mapState(), this.props)
+				)
 
 				this.update()
 			}
@@ -377,10 +377,8 @@ export const create = <T, K extends keyof T>(
 					eventNode.addEventListener(event, (e: Event) => {
 						let prevState = this.mapState(Object.assign({}, this.state))[0]
 
-						if (typeof useEvents !== "undefined") {
-							let mappedEvent = useEvents(this.mapState(), this.props)
-							mappedEvent[invoke](e)
-						}
+						if (typeof useEvents !== "undefined")
+							useEvents(this.mapState(), this.props)[invoke](e)
 
 						let state = this.mapState(Object.assign({}, this.state))[0]
 
@@ -540,8 +538,8 @@ export const create = <T, K extends keyof T>(
 		Object.entries(stateHook).forEach(([name, hook]: any) => {
 			const store = new Store()
 
-			let enhancedSet = (args: T, willDispatch = true) => {
-				if (willDispatch) store.dispatch("update", args)
+			let enhancedSet = (args: T, name: string, willDispatch = true) => {
+				if (willDispatch) store.dispatch("update", args, name)
 
 				return hook[1](args)
 			}
@@ -553,9 +551,9 @@ export const create = <T, K extends keyof T>(
 	}
 
 class Store extends EventTarget {
-	dispatch(name: string, args: any) {
+	dispatch(name: string, args: any, stateName: string) {
 		let event = new Event(name) as StoreEvent
-		event.detail = { args: args }
+		event.detail = { args: args, name: stateName }
 		this.dispatchEvent(event)
 	}
 }

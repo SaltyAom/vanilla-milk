@@ -129,6 +129,11 @@ export const create = <T, K extends keyof T>(
 									hook[2].addEventListener("update", (event: StoreEvent) => {
 										hook[1](event.detail.args, name, false)
 										this.update()
+
+										Object.entries(this.lifecycle).forEach(([_, hook]: any) => {
+											if(!hook.listener.includes(name))
+												hook.callback()
+										})
 									})
 								}
 							)

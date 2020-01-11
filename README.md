@@ -12,7 +12,7 @@ Vanilla Milk feature:
 * No class, just function.
 * Life-cycle hooks.
 * Expressive Vanilla like API structure.
-* Very small (1kB gzipped on production).
+* Very small (2.4kB gzipped on production).
 * Encapsulated style, ID and class name.
 * Zero dependencies.
 * TypeScript support.
@@ -56,7 +56,7 @@ First parameter is a callback to display HTML Element.
 import { create } from "vanilla-milk"
 
 const MilkComponent = create((display) => 
-	display(`<h1>Hello World! Milk Component!</h1>`)
+    display(`<h1>Hello World! Milk Component!</h1>`)
 )
 ```
 We have just create `MilkComponent` which will return `<h1>Hello World</h1>`  
@@ -73,7 +73,7 @@ Now let's name the component `milk-element`, so it can be use in HTML. (Web Comp
 import { create, define } from "vanilla-milk"
 
 const MilkComponent = create((display) => 
-	display(`<h1>Hello World! Milk Component!</h1>`)
+    display(`<h1>Hello World! Milk Component!</h1>`)
 )
 
 define("milk-component", MilkComponent)
@@ -115,12 +115,12 @@ Vanilla Milk are designed to be expressive. So we separate the state, props and 
 import { create, define, useState } from "vanilla-milk"
 
 const MilkComponent = create((display, state) => {
-	let { count } = state
+    let { count } = state
     
-	return display(`<h1>Count ${count}</h1>`)
+    return display(`<h1>Count ${count}</h1>`)
 },
 {
-	counter: useState(0)
+    counter: useState(0)
 })
 
 define("milk-component", MilkComponent)
@@ -130,16 +130,16 @@ So, what's happend here?
 The second parameter of `create` are responsible for handling data, so we can separate and focus on each part.
 ```
 {
-	count: useState(0)
+    count: useState(0)
 }
 ```
 Here we defined state name `count` with value of `0`. `useState` is a function that say, "Hey! We want a state name 'count' with value of 0" to Vanilla Milk or something like that. Vanilla Milk will just handle the rest of that and pass the `count` to the `second parameter` of the view callback.
 ```
 const MilkComponent = create((display, state) => {
-	console.log(state) // { count: 0 }
+    console.log(state) // { count: 0 }
 },
 {
-	count: useState(0)
+    count: useState(0)
 })
 ```
 Lastly, we display counter to the view.
@@ -147,10 +147,10 @@ Lastly, we display counter to the view.
 import { create, define, useState } from "vanilla-milk"
 
 const MilkComponent = create((display, state) => {
-	return display(`<h1>Count ${state.count}</h1>`)
+    return display(`<h1>Count ${state.count}</h1>`)
 },
 {
-	count: useState(0)
+    count: useState(0)
 })
 
 define("milk-component", MilkComponent)
@@ -165,13 +165,13 @@ Let add a button.
 import { create, define, useState } from "vanilla-milk"
 
 const MilkComponent = create((display, state) => {
-	return display(`
-		<h1>Count ${state.count}</h1>
-    	<button id="increase-count">Increase count</button>
+    return display(`
+        <h1>Count ${state.count}</h1>
+        <button id="increase-count">Increase count</button>
 	`)
 },
 {
-	count: useState(0)
+    count: useState(0)
 })
 
 define("milk-component", MilkComponent)
@@ -182,18 +182,18 @@ You define any `events` you want here! It's take callback function so you're fre
 import { create, define, useState } from "vanilla-milk"
 
 const MilkComponent = create((display, state, _, events) => {
-	console.log(events) // { increaseCount: "increaseCount" }
+    console.log(events) // { increaseCount: "increaseCount" }
 
-	return display(`
-		<h1>Count ${state.count}</h1>
-    	<button id="increase-count" @click="${events.increaseCount}">Increase count</button>
+    return display(`
+        <h1>Count ${state.count}</h1>
+        <button id="increase-count" @click="${events.increaseCount}">Increase count</button>
 	`)
 },
 {
-	count: useState(0)
+    count: useState(0)
 },
 ([state, set], _) => {
-	let increaseCount = () => set.count(state.count + 1)
+    let increaseCount = () => set.count(state.count + 1)
     
     return { increaseCount }
 })
@@ -204,7 +204,7 @@ define("milk-component", MilkComponent)
 ###### *props will be explained in next section.
 ```javascript
 ([state, set], props) => {
-	let increaseCount = () => set.count(state.count + 1)
+    let increaseCount = () => set.count(state.count + 1)
     
     return { increaseCount }
 })
@@ -245,14 +245,14 @@ import { useProps } from "vanilla-milk"
 Now let's say that we want to have a prop name `hello`. Like `useState` we do it like this:
 ```javascript
 {
-	count: useState(0),
-	hello: useProps()
+    count: useState(0),
+    hello: useProps()
 }
 ```
 And access it like state
 ```javascript
 create((display, state, props) => {
-	console.log(props.hello) // null if there's no value passed
+    console.log(props.hello) // null if there's no value passed
 })
 ```
 So let's define the component real quick to see how it work.
@@ -260,9 +260,9 @@ So let's define the component real quick to see how it work.
 import { create, define, useProps } from "vanilla-milk"
 
 const MilkComponent = create((display, state, props) => {
-	return display(`<h1>hello ${props.hello}</h1>`)
+    return display(`<h1>hello ${props.hello}</h1>`)
 },{
-	hello: useProps()
+    hello: useProps()
 })
 
 define("milk-component", MilkComponent)
@@ -282,7 +282,7 @@ In HTML:
 And access it:
 ```javascript
 const MilkComponent = create((display, state, props) => {
-	console.log(props.children) // Hello World
+    console.log(props.children) // Hello World
 })
 ```
 That's it! Unlike `useState`, `useProps` is super to use! :tada::tada:
@@ -297,9 +297,9 @@ import { useEffect } from "vanilla-milk"
 Again, add it to second paramter of `create` like `useState` and `useProps`
 ```javascript
 {
-	hello: useProps(),
-	logHello: useEffect((state, props) => {
-		console.log(props.hello) // Log everytime hello changed
+    hello: useProps(),
+    logHello: useEffect((state, props) => {
+        console.log(props.hello) // Log everytime hello changed
     }, ["hello"])
 }
 ```
@@ -316,8 +316,8 @@ Now we hello is changed, first callback will run. Like view callback, useEffect 
 {
     hello: useProps(),
     count: useState(),
-	logHello: useEffect((state, props) => {
-    	console.log(props)
+    logHello: useEffect((state, props) => {
+        console.log(props)
     }, ["count"])
 }
   
@@ -325,10 +325,67 @@ Now we hello is changed, first callback will run. Like view callback, useEffect 
 {
     hello: useProps(),
     count: useProps(),
-	logHello: useEffect((state, props) => {
-    	console.log(props)
+    logHello: useEffect((state, props) => {
+        console.log(props)
     }, ["count", "count"])
 }
+```
+## useShareState
+In medium to large architect JavaScript app. Shared state is very common. Mostly we add library which is responsible for share state with a common idea of store. eg: Redux.
+  
+In Vanilla Milk, share state is built-in and it's easier than using a storage. All it need to do is to define state with `useState` and wrap it with `useShareState`.
+```javascript
+let sharedTea = useShareState({
+    sugar: useState(1),
+    amount: useState(100)
+})
+```
+And then add to `data` layer like normal state. Make sure that `useShareState` isn't call in `data layer` otherwise it won't be able to share.
+```javascipt
+let sharedTea = useShareState({
+    sugar: useState(1),
+    amount: useState(100)
+})
+
+const DisplaySugar = create(
+    (display, _, props) =>
+        display(`<h1>${props.sugar}</h1>`),
+    {
+        sharedStateFromWithComponent: sharedTea
+    }
+)
+```
+When state is shared, it'll act perfectly like local state unless it will update when itself is updated on other component.
+```javascipt
+let sharedTea = useShareState({
+    sugar: useState(1),
+    amount: useState(100)
+})
+
+const DisplaySugar = create(
+    (display, { sugar }) =>
+        // Will update when set.sugar on other component is fired
+        display(`<h1>${sugar}</h1>`),
+    {
+        sharedStateFromWithComponent: sharedTea
+    }
+)
+
+const UpdateSugarButton = create(
+    (display, _, props) =>
+        display(`<button @click="addMoreSugar">Add more sugar</button>`),
+    {
+        /* You can defined any state name you want, even 
+           if it's not the same with other component      */
+
+        sharedStateFromWithComponent: sharedTea
+    },
+    ([{ sugar }, set) => {
+    	let addMoreSugar = () => set.sugar(sugar + 1) // When this is clicked, displa
+        
+        return { addMoreSugar }
+    }
+)
 ```
   
 ## Milk DOM In depth
@@ -337,37 +394,36 @@ Milk DOM cover a lot of thing under the cover but the main concept is to compare
 Since Milk DOM is written in template string, it's very hard for Vanilla Milk to identify which textNode should replace Node or vice-versa. In this case, you shouldn't replace existed dom with blank text ("") like how React, Vue, other library does (which will sometime, occured an unexpected error). Instead Vanilla Milk offter a way to replace Node with blank Node by putting any element with attribute of `__hidden__`
 ```javascript
 const MilkCard = create(
-	(display, { isOpen }, { title, cover, children }, events) => {
-		return display(`
-			<main id="card" tabIndex=0>
-				<img id="cover" src="${cover}" alt="${title}" />
-				<section id="body">
-					<header id="header">
-						<h1 id="title">${title}</h1>
-						<button id="toggle" @click="${events.toggleCard}">+</button>
-					</header>
-					${
-						isOpen
-							? `<section id="detail">${children}</section>`
-							: `<input @hidden />`
-					}
-				</section>
-			</main>
-		`)
-	},
-	{
-		title: useProps(),
-		cover: useProps(),
-		isOpen: useState(false),
-		cardStyle: useStyleSheet("/card.css")
-	},
-	([state, set], props) => {
-		let toggleCard = () => set.isOpen(!state.isOpen)
+    (display, { isOpen }, { title, cover, children }, events) => {
+        return display(`
+            <main id="card" tabIndex=0>
+                <img id="cover" src="${cover}" alt="${title}" />
+                <section id="body">
+                    <header id="header">
+                        <h1 id="title">${title}</h1>
+                        <button id="toggle" @click="${events.toggleCard}">+</button>
+                    </header>
+                    ${
+                        isOpen
+                            ? `<section id="detail">${children}</section>`
+                            : `<input @hidden />`
+                    }
+                </section>
+            </main>
+        `)
+    },
+    {
+        title: useProps(),
+        cover: useProps(),
+        isOpen: useState(false),
+        cardStyle: useStyleSheet("/card.css")
+    },
+    ([state, set], props) => {
+        let toggleCard = () => set.isOpen(!state.isOpen)
 
-		return { toggleCard }
-	}
+        return { toggleCard }
+    }
 )
-
 ```
 
 Milk DOM's diffing algorithm are seperated into 3 parts.
@@ -382,23 +438,23 @@ import { create, useState } from "vanilla-milk"
 
 // Please don't
 let notSoGood = create((display, { counter }) => {
-	return display(`
-		<section>
-			<h1>Counter: </h1>
-			{counter}
-		</section>
-	`)
+    return display(`
+        <section>
+            <h1>Counter: </h1>
+            {counter}
+        </section>
+    `)
 })
 
 // Better~
 let wellDone = create((display) => {
-	return display(`
-		<section>
-			<h1>
-				Counter: {state}
-			</h1>
-		</section>
-	`)
+    return display(`
+        <section>
+            <h1>
+                Counter: {state}
+            </h1>
+        </section>
+    `)
 })
 ```
 Not only that storing textNode in an element are safer but also has better performance from prevent recursion between each node.
@@ -411,11 +467,11 @@ import { create } from "vanilla-milk"
 
 // This is ok
 let multipleRootNode = create((display, { counter }) => {
-	return display(`
-		<h1>Hello! I'm the root node!</h1>
-		<h2>No way! I'm the root node too!</h2>
-		<p>It's ok to use multiple root node in Vanilla Milk</p>
-	`)
+    return display(`
+        <h1>Hello! I'm the root node!</h1>
+        <h2>No way! I'm the root node too!</h2>
+        <p>It's ok to use multiple root node in Vanilla Milk</p>
+    `)
 })
 ```
 
@@ -428,30 +484,30 @@ import { create, useStyleSheet } from "vanilla-milk"
 
 // Link stylesheet in component.
 let coolCard = create((display, { counter }) => {
-	return display(`
-		<div class="card"></div>
-	`)
+    return display(`
+        <div class="card"></div>
+    `)
 },
 {
-	cardStyle: useStyleSheet("/card.css")
+    cardStyle: useStyleSheet("/card.css")
 })
 
 // Or even define style tag inside
 let coolCard = create(
-	(display) => display(`
-		<style>
-			.card {
-				display: flex;
-				flex-direction: column;
-				width: 300px;
-				padding: 20px 12px;
-				borderRadius: 4px;
-				box-shadow: 0 4px 8px rgba(0,0,0,.25);
-			}
-		</style>
-		<div class="card">
-		</div>
-	`)
+    (display) => display(`
+        <style>
+            .card {
+                display: flex;
+                flex-direction: column;
+                width: 300px;
+                padding: 20px 12px;
+                borderRadius: 4px;
+                box-shadow: 0 4px 8px rgba(0,0,0,.25);
+            }
+        </style>
+        <div class="card">
+        </div>
+    `)
 )
 ```
   

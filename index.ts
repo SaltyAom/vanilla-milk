@@ -84,7 +84,7 @@ export const create = <T, K extends keyof T>(
 				return observedProps
 			}
 
-			attributeChangedCallback(name: string, oldValue: any, newValue: any) {
+			attributeChangedCallback(name: string) {
 				let attrValue = this.parseAttribute(name)
 
 				this.props[name] = attrValue
@@ -125,15 +125,19 @@ export const create = <T, K extends keyof T>(
 							return Object.entries(hook.shared).forEach(
 								([name, hook]: any) => {
 									this.state[name] = hook[0]
-									this.setState[name] = (args: typeof hook[0]) => hook[1](args, name)
+									this.setState[name] = (args: typeof hook[0]) =>
+										hook[1](args, name)
 									hook[2].addEventListener("update", (event: StoreEvent) => {
 										hook[1](event.detail.args, name, false)
 										this.update()
 
-										Object.entries(this.lifecycle).forEach(([_, hook]: any) => {
-											if(!hook.listener.includes(name))
-												hook.callback()
-										})
+										Object.entries(
+											this.lifecycle
+										).forEach(([_, hook]: any) =>
+											hook.listener.includes(name)
+												? hook.callback(this.mapState(), this.props)
+												: null
+										)
 									})
 								}
 							)
@@ -147,6 +151,7 @@ export const create = <T, K extends keyof T>(
 					}
 				})
 
+				/* Hide component when stylesheet haven't finished loading */
 				if (this.stylesheet.source.length) this.style.display = "none"
 
 				this.observer = new MutationObserver(mutationsList =>
@@ -164,7 +169,7 @@ export const create = <T, K extends keyof T>(
 					subtree: true
 				})
 
-				Object.entries(this.lifecycle).forEach(([name, hook]: any) =>
+				Object.entries(this.lifecycle).forEach(([_, hook]: any) =>
 					hook.callback(this.mapState(), this.props)
 				)
 
@@ -257,9 +262,8 @@ export const create = <T, K extends keyof T>(
 				/* Handle child overwritten */
 				let hidden = document.createElement("div")
 				hidden.setAttribute("class", "__vanilla_milk_hidden__")
-				while (templateChild.length < displayedChild.length) {
+				while (templateChild.length < displayedChild.length)
 					template.appendChild(hidden.cloneNode(true))
-				}
 
 				templateChild.forEach((templateChildNode: HTMLElement, index) => {
 					if (templateChildNode.isEqualNode(displayedChild[index])) return
@@ -334,7 +338,7 @@ export const create = <T, K extends keyof T>(
 				})
 
 				if (diff.length < displayedChild.length)
-					displayedChild.forEach((displayedNode, index) => {
+					displayedChild.forEach((_, index) => {
 						if (index >= diff.length) return
 
 						displayed.removeChild(displayedChild[index + 1])
@@ -443,11 +447,12 @@ export const create = <T, K extends keyof T>(
 			onPropsChange(attributeName: string): void {
 				let mappedState = this.mapState()
 
-				Object.entries(this.lifecycle).forEach(
-					([lifeCycleName, { listener, callback }]: any) => {
-						if (listener.includes(attributeName))
-							callback(mappedState, this.props)
-					}
+				Object.entries(
+					this.lifecycle
+				).forEach(([_, { listener, callback }]: any) =>
+					listener.includes(attributeName)
+						? callback(mappedState, this.props)
+						: null
 				)
 			}
 
@@ -455,11 +460,11 @@ export const create = <T, K extends keyof T>(
 				let diffState = Object.entries(state).filter(
 						([name, value]) => prevState[name] !== value
 					),
-					mappedDiff = diffState.map(([name, value]) => name),
+					mappedDiff = diffState.map(([name, _]) => name),
 					mappedState = this.mapState()
 
 				Object.entries(this.lifecycle).forEach(
-					([lifeCycleName, { listener, callback }]: any) =>
+					([_, { listener, callback }]: any) =>
 						mappedDiff.forEach(diffState => {
 							if (!listener.includes(diffState)) return
 

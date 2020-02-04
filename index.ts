@@ -131,9 +131,7 @@ export const create = <T, K extends keyof T>(
 										hook[1](event.detail.args, name, false)
 										this.update()
 
-										Object.entries(
-											this.lifecycle
-										).forEach(([_, hook]: any) =>
+										Object.entries(this.lifecycle).forEach(([_, hook]: any) =>
 											hook.listener.includes(name)
 												? hook.callback(this.mapState(), this.props)
 												: null
@@ -181,7 +179,7 @@ export const create = <T, K extends keyof T>(
 					children = new String()
 
 				Array.from(this.children).forEach(
-					(node: any) => (children += node.outerHTML)
+					({ outerHTML }) => (children += outerHTML)
 				)
 
 				let stylesheet = this.stylesheet.source.length
@@ -345,7 +343,7 @@ export const create = <T, K extends keyof T>(
 					})
 
 				textDiff.forEach(
-					(text, index) =>
+					(_, index) =>
 						(displayed.childNodes[index].textContent = textDiff[index])
 				)
 
@@ -487,26 +485,41 @@ export const create = <T, K extends keyof T>(
 				return [mappedState, this.setState]
 			}
 
-			parseAttribute(name: string): string | boolean | number {
-				let attrValue: string | boolean | number = this.getAttribute(name)
+			parseAttribute(name: string, deep = false): string | boolean | number | any[] {
+				let attr: string | boolean | number | any[] = deep
+					? name
+					: this.getAttribute(name)
 
-				switch (attrValue) {
+				switch (attr) {
 					case "true":
-						attrValue = true
+						attr = true
 						break
 
 					case "false":
-						attrValue = false
+						attr = false
 						break
 
 					default:
-						if (/^[-|+]?[0-9]*$/.test(attrValue)) {
-							let temporyValue = parseInt(attrValue, 10)
-							if (!isNaN(temporyValue)) attrValue = parseInt(attrValue, 10)
+						if (/^[-|+]?[0-9]*$/.test(attr)) {
+							let temp = parseInt(attr, 10)
+							if (!isNaN(temp)) attr = parseInt(attr, 10)
+						}
+
+						let temp = `${attr}`
+						// Is array
+						if (temp.slice(0, 1) === "[") {
+							let tempArr: string[] = temp.replace(/\[|\]/g, "").split(","),
+								parsedArr: any[] = []
+
+							tempArr.forEach(arr => 
+								parsedArr.push(this.parseAttribute(arr, true))
+                            )
+                            
+                            attr = parsedArr
 						}
 				}
 
-				return attrValue
+				return attr
 			}
 
 			isReady() {
@@ -558,6 +571,9 @@ export const create = <T, K extends keyof T>(
 		})
 
 		return { type: "hookShareState", ...enhancedStateHook }
+	},
+	list = (HTMLArray: string[]) => {
+        return `${HTMLArray.map((html) => html)}`.replace(/\,/g, "")
 	}
 
 class Store extends EventTarget {
@@ -573,7 +589,8 @@ const vanillaMilk = {
 	define: define,
 	useState,
 	useProps,
-	useEffect
+	useEffect,
+	list
 }
 
 export default vanillaMilk
